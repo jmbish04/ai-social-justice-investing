@@ -1,0 +1,288 @@
+version: 1
+name: ai-social-justice-investing — Full Podcast Demo System
+description: >
+  Comprehensive Codex Cloud task manifest combining PROMPT_3 (backend workflow,
+  AI agents, Durable Objects, Queues, R2/D1 integration) and PROMPT_4 (frontend
+  integration, audio player, transcript editor, guest management, brainstorm flow).
+defaults:
+  language: typescript
+  repo: https://github.com/jmbish04/ai-social-justice-investing
+  keep_docs_updated: true
+  enforce_agents_md: true
+
+guards:
+  - name: Validate Wrangler Bindings
+    description: Ensure wrangler.toml bindings match required configuration.
+    files: [wrangler.toml]
+    must_include:
+      - 'binding = "DB"'
+      - 'database_name = "sji-app-db"'
+      - 'database_id = "34b476f8-1f88-4062-816d-2acfb3449a7d"'
+      - 'binding = "KV"'
+      - 'binding = "BUCKET"'
+      - 'bucket_name = "sji-app-public"'
+      - 'R2_PUBLIC_URL = "https://sji-app-public.b3304b14848de15c72c24a14b0cd187d.r2.dev"'
+      - 'MODEL_REASONING = "@cf/meta/llama-3.1-8b-instruct"'
+      - 'MODEL_STT = "@cf/openai/whisper-base-en"'
+
+# ==========================================================
+# PHASE 1 — PROMPT_3 BACKEND IMPLEMENTATION
+# ==========================================================
+tasks:
+
+  - id: backend.schema
+    title: D1 Schema Migrations — transcripts + audio_versions
+    rationale: >
+      Create database tables for podcast transcripts and audio versioning.
+    changes:
+      - path: migrations/2025-10-30_add_podcast_tables.sql
+        content: |
+          CREATE TABLE IF NOT EXISTS transcripts (
+            id TEXT PRIMARY KEY,
+            episode_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            body TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (episode_id) REFERENCES episodes(id)
+          );
+          CREATE TABLE IF NOT EXISTS audio_versions (
+            id TEXT PRIMARY KEY,
+            episode_id TEXT NOT NULL,
+            transcript_id TEXT NOT NULL,
+            version INTEGER NOT NULL,
+            r2_key TEXT NOT NULL,
+            r2_url TEXT NOT NULL,
+            created_at INTEGER NOT NULL,
+            FOREIGN KEY (episode_id) REFERENCES episodes(id),
+            FOREIGN KEY (transcript_id) REFERENCES transcripts(id)
+          );
+    acceptance_criteria:
+      - D1 migrations apply cleanly via `wrangler d1 migrations apply sji-app-db`
+      - Tables visible with `wrangler d1 execute --command ".tables"`
+
+  - id: backend.agents
+    title: PodcastBuilderAgent + AudioDirectorAgent
+    rationale: >
+      Create AI agents for transcript generation and audio synthesis (stubbed).
+    changes:
+      - path: src/agents/PodcastBuilderAgent.ts
+        content: |
+          export class PodcastBuilderAgent {
+            env: any;
+            constructor(env: any) { this.env = env; }
+
+            async generateTranscript(outline: any): Promise<{ text: string }> {
+              const prompt = `
+                You are a social impact podcast writer.
+                Create a short, 3-segment dialogue between host and guest
+                based on this outline:
+                ${JSON.stringify(outline, null, 2)}
+              `;
+              const res = await this.env.AI.run(this.env.MODEL_REASONING, { prompt });
+              return { text: res?.output_text ?? "" };
+            }
+          }
+      - path: src/agents/AudioDirectorAgent.ts
+        content: |
+          export class AudioDirectorAgent {
+            env: any;
+            constructor(env: any) { this.env = env; }
+
+            async generateAudio(transcriptText: string): Promise<{ buffer: ArrayBuffer, meta: { duration: number } }> {
+              const silence = new ArrayBuffer(1024);
+              return { buffer: silence, meta: { duration: 0 } };
+            }
+          }
+    acceptance_criteria:
+      - Agents compile under strict TS
+      - Transcript generation returns text string
+      - Audio agent produces ArrayBuffer placeholder
+
+  - id: backend.workflow
+    title: GeneratePodcastDemoWorkflow Orchestrator
+    rationale: >
+      Implement the full durable workflow to generate transcripts, audio, and persist artifacts.
+    changes:
+      - path: src/workflows/generatePodcastDemo.ts
+        content: |
+          import { PodcastBuilderAgent } from "../agents/PodcastBuilderAgent";
+          import { AudioDirectorAgent } from "../agents/AudioDirectorAgent";
+
+          export class GeneratePodcastDemoWorkflow {
+            env: any;
+            constructor(env: any) { this.env = env; }
+
+            async run(episodeId: string) {
+              const episode = await this.env.DB
+                .prepare("SELECT * FROM episodes WHERE id = ?")
+                .bind(episodeId)
+                .first();
+              if (!episode) throw new Error("Episode not found");
+
+              const outline = episode.outline ? JSON.parse(episode.outline) : {};
+
+              const transcriptAgent = new PodcastBuilderAgent(this.env);
+              const transcript = await transcriptAgent.generateTranscript(outline);
+
+              const version = Date.now();
+              const transcriptId = crypto.randomUUID();
+              await this.env.DB.prepare(`
+                INSERT INTO transcripts (id, episode_id, version, body, created_at)
+                VALUES (?, ?, ?, ?, ?)
+              `).bind(transcriptId, episodeId, version, transcript.text, Date.now()).run();
+
+              const audioAgent = new AudioDirectorAgent(this.env);
+              const audioResult = await audioAgent.generateAudio(transcript.text);
+
+              const r2Key = `podcasts/${episodeId}/v${version}.mp3`;
+              await this.env.BUCKET.put(r2Key, audioResult.buffer, {
+                httpMetadata: { contentType: "audio/mpeg" },
+              });
+              const r2Url = `${this.env.R2_PUBLIC_URL}/${r2Key}`;
+
+              const audioId = crypto.randomUUID();
+              await this.env.DB.prepare(`
+                INSERT INTO audio_versions (id, episode_id, transcript_id, version, r2_key, r2_url, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+              `).bind(audioId, episodeId, transcriptId, version, r2Key, r2Url, Date.now()).run();
+
+              return { ok: true, episodeId, version, transcriptId, audioId, r2Url };
+            }
+          }
+    acceptance_criteria:
+      - Successfully creates transcript + audio_versions
+      - R2 upload returns a valid public URL
+      - Returns JSON summary
+
+  - id: backend.actor
+    title: EpisodeActor — Durable Object Wrapper
+    rationale: Serialize workflow execution per episode.
+    changes:
+      - path: src/actors/EpisodeActor.ts
+        content: |
+          import { GeneratePodcastDemoWorkflow } from "../workflows/generatePodcastDemo";
+
+          export class EpisodeActor {
+            state: DurableObjectState;
+            env: any;
+            constructor(state: DurableObjectState, env: any) {
+              this.state = state;
+              this.env = env;
+            }
+
+            async startWorkflow(episodeId: string) {
+              const wf = new GeneratePodcastDemoWorkflow(this.env);
+              return wf.run(episodeId);
+            }
+
+            async fetch(request: Request) {
+              const url = new URL(request.url);
+              if (url.pathname === "/start" && request.method === "POST") {
+                const { episodeId } = await request.json();
+                const result = await this.startWorkflow(episodeId);
+                return new Response(JSON.stringify(result), { headers: { "content-type": "application/json" } });
+              }
+              return new Response("Not Found", { status: 404 });
+            }
+          }
+    acceptance_criteria:
+      - Compiles and exposes POST /start
+      - Executes GeneratePodcastDemoWorkflow
+      - Returns structured JSON
+
+  - id: backend.api
+    title: Hono API endpoint for /api/episodes/:id/generate-audio
+    rationale: Connects frontend button to workflow runner.
+    changes:
+      - path: src/index.ts
+        patch: |
+          app.post('/api/episodes/:id/generate-audio', async (c) => {
+            const episodeId = c.req.param('id');
+            const { GeneratePodcastDemoWorkflow } = await import('./workflows/generatePodcastDemo');
+            const workflow = new GeneratePodcastDemoWorkflow(c.env);
+            const result = await workflow.run(episodeId);
+            return c.json(result);
+          });
+    acceptance_criteria:
+      - Endpoint callable from web UI
+      - Returns valid JSON { ok, r2Url, version, ... }
+
+  - id: backend.docs
+    title: Update AGENTS.md
+    rationale: >
+      Add all new backend components (agents, workflow, actor, API) with documentation.
+    changes:
+      - path: AGENTS.md
+        patch: |
+          ## PodcastBuilderAgent
+          - Generates transcripts using Workers AI.
+          ## AudioDirectorAgent
+          - Produces placeholder audio buffers (future TTS).
+          ## GeneratePodcastDemoWorkflow
+          - Full end-to-end orchestrator (D1 + R2).
+          ## EpisodeActor
+          - Durable Object per-episode workflow serialization.
+          ## API
+          - POST /api/episodes/:id/generate-audio triggers workflow.
+    acceptance_criteria:
+      - AGENTS.md reflects all implemented components
+
+# ==========================================================
+# PHASE 2 — PROMPT_4 FRONTEND INTEGRATION
+# ==========================================================
+  - id: frontend.ui
+    title: PROMPT_4 Frontend Integration and End-to-End UX
+    rationale: >
+      Complete React integration for podcast generation, transcript editing,
+      playback, and multi-guest flows.
+    changes:
+      - path: codex/prompts/PROMPT_4.md
+        content: |
+          # PROMPT_4.md — Frontend Integration and End-to-End UX
+
+          Implements:
+          - Generate Demo Podcast button flow
+          - Persistent global audio player via React Context
+          - TranscriptEditor with autosave + version diff
+          - Guest management panel
+          - Promote brainstorm → episode creation
+          - Full navigation + streaming integration with Vercel Chat/Stream SDKs
+
+          ## Required Components
+          src/ui/
+          ├── brainstorm/BrainstormChat.tsx
+          ├── episodes/
+          │   ├── EpisodeView.tsx
+          │   ├── TranscriptEditor.tsx
+          │   ├── GuestManager.tsx
+          │   └── EpisodeChat.tsx
+          ├── audio/
+          │   ├── AudioPlayerRoot.tsx
+          │   └── useAudioPlayer.ts
+          └── components/
+              ├── ProgressOverlay.tsx
+              ├── VersionSelector.tsx
+              └── StatusBadge.tsx
+    acceptance_criteria:
+      - Button triggers `/api/episodes/:id/generate-audio`
+      - Transcript editor autosaves via PATCH
+      - AudioPlayerRoot persists across routes
+      - Guests dynamically update
+      - Works in iOS Safari
+
+  - id: frontend.commit
+    title: Commit Frontend Implementation
+    actions:
+      - run: git add -A
+      - run: git commit -m "Frontend integration for podcast generation, editing, and playback"
+    acceptance_criteria:
+      - Builds successfully with `pnpm build`
+      - UI renders all required components
+
+postchecks:
+  - name: Build & Typecheck
+    run: pnpm install && pnpm run build
+  - name: Endpoint Smoke Test
+    description: POST /api/episodes/:id/generate-audio returns valid JSON
+  - name: Frontend Validation
+    description: UI supports end-to-end podcast generation, transcript editing, playback
