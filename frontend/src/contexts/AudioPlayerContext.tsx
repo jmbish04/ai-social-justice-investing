@@ -85,9 +85,11 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
         setState((prev) => ({ ...prev, isPlaying: false, currentTime: 0 }));
       };
 
-      const handleError = (e: ErrorEvent) => {
-        console.error('Audio playback error:', e);
-        setState((prev) => ({ ...prev, isPlaying: false }));
+      const handleError = () => {
+        if (audioRef.current?.error) {
+          console.error('Audio playback error:', audioRef.current.error);
+          setState((prev) => ({ ...prev, isPlaying: false }));
+        }
       };
 
       audio.addEventListener('timeupdate', handleTimeUpdate);
