@@ -64,154 +64,55 @@ This should allow Andrea to preview demo podcast episodes for each idea directly
 
 ⸻
 
-🧩 SYSTEM COMPONENTS TO CREATE
+🧩 SYSTEM COMPONENTS OVERVIEW
 
-1. src/workflows/generatePodcastDemo.ts
+1. `src/workflows/generatePodcastDemo.ts`
 
-This is the main orchestrator.
-Define a GeneratePodcastDemoWorkflow with the following logic:
+   * Houses the class-based `GeneratePodcastDemoWorkflow` orchestrator.
+   * `run(episodeId, progressCallback?)` performs:
+     1. Load episode metadata from D1.
+     2. Instantiate Host/Guest agents via `PodcastBuilderAgent.createForEpisode`.
+     3. Call `generateTranscriptPackage` to obtain markdown text, segments, and word count.
+     4. Compute the next transcript version and insert the transcript row in D1.
+     5. Use `AudioDirectorAgent.generateAndUploadAudio` to create/upload a placeholder file in R2.
+     6. Persist audio metadata in D1 and return `{ ok, success, transcriptId, transcriptVersion, transcriptWordCount, audioVersionId, audio }`.
+   * `triggerPodcastGeneration` coordinates with `EpisodeActor` for serialized execution and status tracking.
 
-// Pseudocode sketch:
-workflow GeneratePodcastDemoWorkflow(episodeId) {
-  // Step 1: Fetch episode and latest outline
-  const episode = await DB.prepare("SELECT * FROM episodes WHERE id=?").bind(episodeId).first();
-  const outline = episode.outline || {};
+2. `src/agents/PodcastBuilderAgent.ts`
 
-  // Step 2: Build transcript
-  const transcriptAgent = new PodcastBuilderAgent(env);
-  const transcript = await transcriptAgent.generateTranscript(outline);
+   * Extends the multi-guest transcript generator with `generateTranscriptPackage`, returning outline, segments, and metadata consumed by the workflow.
+   * Static factory resolves guest personas from `episode_guests`.
 
-  // Step 3: Create D1 transcript version
-  const version = Date.now();
-  const transcriptId = crypto.randomUUID();
-  await DB.prepare(`
-    INSERT INTO transcripts (id, episode_id, version, body, created_at)
-    VALUES (?, ?, ?, ?, ?)
-  `).bind(transcriptId, episodeId, version, transcript.text, Date.now()).run();
+3. `src/agents/AudioDirectorAgent.ts`
 
-  // Step 4: Generate host + guest audio (stub if no TTS)
-  const audioAgent = new AudioDirectorAgent(env);
-  const audioResult = await audioAgent.generateAudio(transcript.text);
+   * Provides `generateAudio` (in-memory placeholder) and `generateAndUploadAudio` (R2 upload + metadata).
+   * Uses deterministic JSON payloads while waiting for Workers AI TTS support.
 
-  // Step 5: Save audio to R2
-  const r2Key = `podcasts/${episodeId}/v${version}.mp3`;
-  await env.BUCKET.put(r2Key, audioResult.buffer, { httpMetadata: { contentType: "audio/mpeg" } });
-  const r2Url = `${env.R2_PUBLIC_URL}/${r2Key}`;
+4. `src/actors/EpisodeActor.ts`
 
-  // Step 6: Write audio version record
-  const audioId = crypto.randomUUID();
-  await DB.prepare(`
-    INSERT INTO audio_versions (id, episode_id, transcript_id, version, r2_key, r2_url, created_at)
-    VALUES (?, ?, ?, ?, ?, ?, ?)
-  `).bind(audioId, episodeId, transcriptId, version, r2Key, r2Url, Date.now()).run();
+   * Durable Object that ensures only one workflow runs per episode.
+   * Tracks `transcriptVersion`, `audioVersionId`, and audio metadata in `state.result` for polling endpoints.
 
-  // Step 7: Return success summary
-  return { ok: true, episodeId, version, r2Url, transcriptId };
-}
+5. API integration
 
-Expose an API route /api/episodes/:id/generate-audio that enqueues this workflow (via Queues API).
+   * `POST /api/episodes/:id/generate-audio` is defined in `src/api/newRoutes.ts` and wired through `src/index.ts`.
+   * Returns the workflow payload so the frontend can refresh transcript/audio lists immediately.
 
-⸻
+6. Database schema
 
-2. src/workflows/queueHandlers.ts
+   * `migrations/2025-10-30_add_podcast_tables.sql` establishes the versioned tables actually in use:
 
-Define queue consumers for background jobs like:
-	•	generate-transcript
-	•	generate-audio
-	•	finalize-podcast
-
-Each should call the agents sequentially and report progress.
-
-Example job payload:
-
-{
-  "episodeId": "uuid",
-  "step": "generate-transcript",
-  "context": { "outline": "..." }
-}
-
-
-⸻
-
-3. src/agents/PodcastBuilderAgent.ts
-
-Implements transcript creation using Workers AI.
-
-export class PodcastBuilderAgent {
-  constructor(env) { this.env = env; }
-
-  async generateTranscript(outline) {
-    const prompt = `
-      You are a social impact podcast writer.
-      Create a short, 3-segment dialogue between host and guest based on this outline:
-      ${JSON.stringify(outline, null, 2)}
-    `;
-    const res = await this.env.AI.run(this.env.MODEL_REASONING, { prompt });
-    return { text: res.output_text };
-  }
-}
-
-
-⸻
-
-4. src/agents/AudioDirectorAgent.ts
-
-Manages TTS generation (stub out if unavailable).
-
-export class AudioDirectorAgent {
-  constructor(env) { this.env = env; }
-
-  async generateAudio(transcriptText) {
-    // TODO: Replace with real TTS once available.
-    // For now, return a silent audio placeholder.
-    const silence = new ArrayBuffer(1024);
-    return { buffer: silence, meta: { duration: 0 } };
-  }
-}
-
-
-⸻
-
-5. src/actors/EpisodeActor.ts
-
-Implements serialized handling of workflows per episode.
-
-export class EpisodeActor {
-  async startWorkflow(episodeId) {
-    const workflow = new GeneratePodcastDemoWorkflow();
-    return await workflow.run(episodeId);
-  }
-}
-
-
-⸻
-
-6. Hono API Endpoint
-
-Extend /src/index.ts:
-
-app.post('/api/episodes/:id/generate-audio', async (c) => {
-  const episodeId = c.req.param('id');
-  const workflow = new GeneratePodcastDemoWorkflow(c.env);
-  const result = await workflow.run(episodeId);
-  return c.json(result);
-});
-
-Return a JSON response including the generated r2Url.
-
-⸻
-
-7. Database Links
-
-Ensure D1 has:
-
+```sql
 CREATE TABLE IF NOT EXISTS transcripts (
   id TEXT PRIMARY KEY,
   episode_id TEXT NOT NULL,
   version INTEGER NOT NULL,
   body TEXT NOT NULL,
+  format TEXT DEFAULT 'markdown',
+  word_count INTEGER,
   created_at INTEGER NOT NULL,
-  FOREIGN KEY (episode_id) REFERENCES episodes(id)
+  FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE,
+  UNIQUE(episode_id, version)
 );
 
 CREATE TABLE IF NOT EXISTS audio_versions (
@@ -221,10 +122,15 @@ CREATE TABLE IF NOT EXISTS audio_versions (
   version INTEGER NOT NULL,
   r2_key TEXT NOT NULL,
   r2_url TEXT NOT NULL,
+  duration_seconds INTEGER,
+  file_size_bytes INTEGER,
+  status TEXT NOT NULL DEFAULT 'generating' CHECK (status IN ('generating', 'ready', 'failed')),
   created_at INTEGER NOT NULL,
-  FOREIGN KEY (episode_id) REFERENCES episodes(id),
-  FOREIGN KEY (transcript_id) REFERENCES transcripts(id)
+  FOREIGN KEY (episode_id) REFERENCES episodes(id) ON DELETE CASCADE,
+  FOREIGN KEY (transcript_id) REFERENCES transcripts(id) ON DELETE CASCADE,
+  UNIQUE(episode_id, version)
 );
+```
 
 
 ⸻
@@ -247,9 +153,10 @@ Claude should:
 	•	src/agents/AudioDirectorAgent.ts
 	•	src/actors/EpisodeActor.ts
 	•	src/index.ts API route
-	2.	Apply any required D1 schema migrations.
-	3.	Verify R2 writes to BUCKET and URLs resolve under R2_PUBLIC_URL.
-	4.	Commit to the repo with message:
+	2.	Add Vitest coverage in src/tests/generatePodcastDemoWorkflow.test.ts and run `npm run test`.
+	3.	Apply any required D1 schema migrations.
+	4.	Verify R2 writes to BUCKET and URLs resolve under R2_PUBLIC_URL.
+	5.	Commit to the repo with message:
 “Add GeneratePodcastDemoWorkflow with R2 audio + transcript pipeline”
 
 ⸻

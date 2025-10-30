@@ -350,6 +350,145 @@ newApi.get('/episodes/:id', async (c) => {
 });
 
 /**
+ * GET /api/episodes/:id/transcripts
+ * Retrieve all transcripts for an episode ordered by version
+ */
+newApi.get('/episodes/:id/transcripts', async (c) => {
+  try {
+    const episodeId = c.req.param('id');
+
+    const result = await c.env.DB.prepare(
+      'SELECT * FROM transcripts WHERE episode_id = ? ORDER BY version DESC'
+    )
+      .bind(episodeId)
+      .all<Transcript>();
+
+    return c.json({ success: true, data: result.results || [] });
+  } catch (error) {
+    console.error('Error fetching transcripts:', error);
+    return c.json({ success: false, error: 'Failed to fetch transcripts' }, 500);
+  }
+});
+
+/**
+ * POST /api/episodes/:id/transcripts
+ * Create a new transcript version manually (Save as new version)
+ */
+newApi.post('/episodes/:id/transcripts', authMiddleware, async (c) => {
+  try {
+    const episodeId = c.req.param('id');
+    const body = await c.req.json<{ body?: string }>();
+
+    if (!body.body) {
+      return c.json({ success: false, error: 'Transcript body is required' }, 400);
+    }
+
+    const wordCount = body.body.trim().length === 0 ? 0 : body.body.trim().split(/\s+/).length;
+    const versionResult = await c.env.DB.prepare(
+      'SELECT MAX(version) as max_version FROM transcripts WHERE episode_id = ?'
+    )
+      .bind(episodeId)
+      .first<{ max_version: number | null }>();
+
+    const nextVersion = (versionResult?.max_version ?? 0) + 1;
+    const transcriptId = crypto.randomUUID();
+    const now = Date.now();
+
+    await c.env.DB.prepare(
+      `INSERT INTO transcripts (id, episode_id, version, body, format, word_count, created_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`
+    )
+      .bind(transcriptId, episodeId, nextVersion, body.body, 'markdown', wordCount, now)
+      .run();
+
+    const created = await c.env.DB.prepare('SELECT * FROM transcripts WHERE id = ?')
+      .bind(transcriptId)
+      .first<Transcript>();
+
+    return c.json({ success: true, data: created }, 201);
+  } catch (error) {
+    console.error('Error creating transcript version:', error);
+    return c.json({ success: false, error: 'Failed to create transcript' }, 500);
+  }
+});
+
+/**
+ * PATCH /api/episodes/:id/transcripts/:transcriptId
+ * Autosave transcript edits
+ */
+newApi.patch('/episodes/:id/transcripts/:transcriptId', authMiddleware, async (c) => {
+  try {
+    const episodeId = c.req.param('id');
+    const transcriptId = c.req.param('transcriptId');
+    const body = await c.req.json<{ body?: string }>();
+
+    if (!body.body) {
+      return c.json({ success: false, error: 'Transcript body is required' }, 400);
+    }
+
+    const wordCount = body.body.trim().length === 0 ? 0 : body.body.trim().split(/\s+/).length;
+
+    await c.env.DB.prepare(
+      `UPDATE transcripts SET body = ?, word_count = ?, format = 'markdown'
+       WHERE id = ? AND episode_id = ?`
+    )
+      .bind(body.body, wordCount, transcriptId, episodeId)
+      .run();
+
+    const updated = await c.env.DB.prepare('SELECT * FROM transcripts WHERE id = ?')
+      .bind(transcriptId)
+      .first<Transcript>();
+
+    return c.json({ success: true, data: updated });
+  } catch (error) {
+    console.error('Error updating transcript:', error);
+    return c.json({ success: false, error: 'Failed to update transcript' }, 500);
+  }
+});
+
+/**
+ * GET /api/episodes/:id/audio-versions
+ * Retrieve audio versions for an episode
+ */
+newApi.get('/episodes/:id/audio-versions', async (c) => {
+  try {
+    const episodeId = c.req.param('id');
+
+    const result = await c.env.DB.prepare(
+      'SELECT * FROM audio_versions WHERE episode_id = ? ORDER BY version DESC'
+    )
+      .bind(episodeId)
+      .all<AudioVersion>();
+
+    return c.json({ success: true, data: result.results || [] });
+  } catch (error) {
+    console.error('Error fetching audio versions:', error);
+    return c.json({ success: false, error: 'Failed to fetch audio versions' }, 500);
+  }
+});
+
+/**
+ * GET /api/episodes/:id/workflow-status
+ * Proxy EpisodeActor workflow status for polling from the frontend
+ */
+newApi.get('/episodes/:id/workflow-status', async (c) => {
+  try {
+    const episodeId = c.req.param('id');
+    const actorId = c.env.EPISODE_ACTOR.idFromName(episodeId);
+    const actor = c.env.EPISODE_ACTOR.get(actorId);
+
+    const response = await actor.fetch(
+      new Request(`https://actor.internal/status?episodeId=${episodeId}`)
+    );
+    const payload = await response.json();
+    return c.json(payload);
+  } catch (error) {
+    console.error('Error fetching workflow status:', error);
+    return c.json({ success: false, error: 'Failed to fetch workflow status' }, 500);
+  }
+});
+
+/**
  * GET /api/episodes/:id/guests
  * Get guests for an episode
  */
@@ -415,6 +554,28 @@ newApi.post('/episodes/:id/guests', authMiddleware, async (c) => {
 });
 
 /**
+ * DELETE /api/episodes/:id/guests/:guestId
+ * Remove a guest from an episode
+ */
+newApi.delete('/episodes/:id/guests/:guestId', authMiddleware, async (c) => {
+  try {
+    const episodeId = c.req.param('id');
+    const guestId = c.req.param('guestId');
+
+    await c.env.DB.prepare(
+      'DELETE FROM episode_guests WHERE episode_id = ? AND guest_profile_id = ?'
+    )
+      .bind(episodeId, guestId)
+      .run();
+
+    return c.json({ success: true, data: { removed: true } });
+  } catch (error) {
+    console.error('Error removing guest from episode:', error);
+    return c.json({ success: false, error: 'Failed to remove guest' }, 500);
+  }
+});
+
+/**
  * POST /api/episodes/:id/generate-audio
  * Trigger podcast generation workflow
  */
@@ -428,21 +589,26 @@ newApi.post('/episodes/:id/generate-audio', authMiddleware, async (c) => {
     if (!result.success) {
       return c.json({
         success: false,
+        ok: false,
         error: result.error || 'Generation failed',
       }, 500);
     }
 
     return c.json({
       success: true,
-      message: 'Podcast generation started',
+      ok: true,
+      message: 'Podcast generation completed',
       data: {
         transcriptId: result.transcriptId,
+        transcriptVersion: result.transcriptVersion,
+        transcriptWordCount: result.transcriptWordCount,
         audioVersionId: result.audioVersionId,
+        audio: result.audio,
       },
     });
   } catch (error) {
     console.error('Error triggering podcast generation:', error);
-    return c.json({ success: false, error: 'Failed to start generation' }, 500);
+    return c.json({ success: false, ok: false, error: 'Failed to start generation' }, 500);
   }
 });
 

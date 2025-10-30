@@ -30,7 +30,14 @@ interface EpisodeWorkflowState {
   error: string | null;
   result: {
     transcriptId?: string;
+    transcriptVersion?: number;
     audioVersionId?: string;
+    audio?: {
+      r2Key?: string;
+      r2Url?: string;
+      durationSeconds?: number;
+      fileSizeBytes?: number;
+    };
   } | null;
 }
 
@@ -245,14 +252,26 @@ export class EpisodeActor extends DurableObject<Bindings> {
     const state = await this.getState(episodeId);
     const body = await request.json() as {
       transcriptId?: string;
+      transcriptVersion?: number;
       audioVersionId?: string;
+      audio?: {
+        r2Key?: string;
+        r2Url?: string;
+        durationSeconds?: number;
+        fileSizeBytes?: number;
+      };
     };
 
     state.status = 'completed';
     state.currentStep = 'Workflow completed successfully';
     state.progress = 100;
     state.completedAt = Date.now();
-    state.result = body;
+    state.result = {
+      transcriptId: body.transcriptId,
+      transcriptVersion: body.transcriptVersion,
+      audioVersionId: body.audioVersionId,
+      audio: body.audio,
+    };
 
     await this.saveState();
 

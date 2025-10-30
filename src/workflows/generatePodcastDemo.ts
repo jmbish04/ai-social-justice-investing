@@ -15,131 +15,213 @@
  * @module workflows/generatePodcastDemo
  */
 
-import { Bindings, Episode, Transcript, AudioVersion } from '../types/bindings';
-import { HostAgent } from '../agents/HostAgent';
-import { GuestAgent } from '../agents/GuestAgent';
+import { Bindings, Episode } from '../types/bindings';
 import { PodcastBuilderAgent } from '../agents/PodcastBuilderAgent';
 import { AudioDirectorAgent } from '../agents/AudioDirectorAgent';
 
 /**
- * Workflow result
+ * Workflow execution result structure
  */
 export interface PodcastGenerationResult {
   success: boolean;
+  ok?: boolean;
   transcriptId?: string;
+  transcriptVersion?: number;
+  transcriptWordCount?: number;
   audioVersionId?: string;
+  audio?: {
+    r2Key: string;
+    r2Url: string;
+    durationSeconds: number;
+    fileSizeBytes: number;
+  };
   error?: string;
 }
 
 /**
- * Progress callback function type
+ * Progress callback function type used for reporting workflow status to actors/UI
  */
 type ProgressCallback = (step: string, progress: number) => Promise<void>;
 
 /**
- * Main workflow function to generate a complete podcast demo
- *
- * @param env - Cloudflare Worker environment bindings
- * @param episodeId - ID of the episode to generate
- * @param progressCallback - Optional callback for progress updates
- * @returns Generation result with IDs
+ * GeneratePodcastDemoWorkflow encapsulates the orchestration logic for creating demo podcasts.
  */
-export async function generatePodcastDemoWorkflow(
-  env: Bindings,
-  episodeId: string,
-  progressCallback?: ProgressCallback
-): Promise<PodcastGenerationResult> {
-  try {
-    // Step 1: Fetch episode from D1
-    await updateProgress(progressCallback, 'Fetching episode data', 10);
+export class GeneratePodcastDemoWorkflow {
+  private progressCallback?: ProgressCallback;
 
-    const episode = await fetchEpisode(env, episodeId);
-    if (!episode) {
-      throw new Error(`Episode not found: ${episodeId}`);
-    }
+  /**
+   * Create a new workflow instance.
+   * @param env - Cloudflare Worker environment bindings
+   */
+  constructor(private readonly env: Bindings) {}
 
-    // Step 2: Fetch guest profiles
-    await updateProgress(progressCallback, 'Loading guest profiles', 20);
+  /**
+   * Execute the workflow for a given episode.
+   * @param episodeId - Identifier of the episode to process
+   * @param progressCallback - Optional callback for progress updates
+   * @returns Detailed workflow result including transcript/audio identifiers
+   */
+  async run(episodeId: string, progressCallback?: ProgressCallback): Promise<PodcastGenerationResult> {
+    this.progressCallback = progressCallback;
 
-    const guestLinks = await env.DB.prepare(
-      'SELECT guest_profile_id FROM episode_guests WHERE episode_id = ?'
-    )
-      .bind(episodeId)
-      .all<{ guest_profile_id: string }>();
-
-    if (!guestLinks.results || guestLinks.results.length === 0) {
-      throw new Error('No guests assigned to this episode');
-    }
-
-    // Step 3: Instantiate agents
-    await updateProgress(progressCallback, 'Initializing AI agents', 30);
-
-    const hostAgent = new HostAgent(env);
-    const guestAgents: GuestAgent[] = [];
-
-    for (const link of guestLinks.results) {
-      const guest = await GuestAgent.loadFromDatabase(env, link.guest_profile_id);
-      if (guest) {
-        guestAgents.push(guest);
+    try {
+      await this.updateProgress('Fetching episode data', 10);
+      const episode = await this.fetchEpisode(episodeId);
+      if (!episode) {
+        throw new Error(`Episode not found: ${episodeId}`);
       }
+
+      await this.updateProgress('Loading guest profiles', 20);
+      const builder = await PodcastBuilderAgent.createForEpisode(this.env, episodeId);
+      if (!builder) {
+        throw new Error('No guests assigned to this episode');
+      }
+
+      await this.updateProgress('Generating transcript content', 40);
+      const transcriptPackage = await builder.generateTranscriptPackage({
+        title: episode.title,
+        description: episode.description ?? '',
+      });
+
+      await this.updateProgress('Calculating transcript version', 55);
+      const transcriptVersion = await this.getNextTranscriptVersion(episodeId);
+
+      await this.updateProgress('Saving transcript to database', 65);
+      const transcriptId = await this.insertTranscript(
+        episodeId,
+        transcriptVersion,
+        transcriptPackage.text,
+        transcriptPackage.wordCount
+      );
+
+      await this.updateProgress('Generating audio placeholder', 75);
+      const audioDirector = new AudioDirectorAgent(this.env);
+      const audioResult = await audioDirector.generateAndUploadAudio(
+        episodeId,
+        transcriptVersion,
+        transcriptPackage.segments.map(segment => ({
+          speaker: segment.speaker,
+          text: segment.content,
+        }))
+      );
+
+      await this.updateProgress('Saving audio metadata', 90);
+      const audioVersionId = await this.insertAudioVersion(
+        episodeId,
+        transcriptId,
+        transcriptVersion,
+        audioResult
+      );
+
+      await this.updateProgress('Podcast generation completed', 100);
+
+      return {
+        success: true,
+        ok: true,
+        transcriptId,
+        transcriptVersion,
+        transcriptWordCount: transcriptPackage.wordCount,
+        audioVersionId,
+        audio: {
+          r2Key: audioResult.r2Key,
+          r2Url: audioResult.r2Url,
+          durationSeconds: audioResult.durationSeconds,
+          fileSizeBytes: audioResult.fileSizeBytes,
+        },
+      };
+    } catch (error) {
+      console.error('Podcast generation workflow error:', error);
+      return {
+        success: false,
+        ok: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    } finally {
+      this.progressCallback = undefined;
     }
+  }
 
-    if (guestAgents.length === 0) {
-      throw new Error('Failed to load guest agents');
+  /**
+   * Fetch episode data from D1.
+   * @param episodeId - Episode identifier
+   * @returns Episode record or null
+   */
+  private async fetchEpisode(episodeId: string): Promise<Episode | null> {
+    try {
+      const result = await this.env.DB.prepare('SELECT * FROM episodes WHERE id = ?')
+        .bind(episodeId)
+        .first<Episode>();
+
+      return result ?? null;
+    } catch (error) {
+      console.error('Error fetching episode:', error);
+      return null;
     }
+  }
 
-    // Step 4: Create PodcastBuilderAgent
-    await updateProgress(progressCallback, 'Creating podcast builder', 35);
-
-    const builder = new PodcastBuilderAgent(env, hostAgent, guestAgents);
-
-    // Step 5: Generate transcript
-    await updateProgress(progressCallback, 'Generating transcript (this may take a few minutes)', 40);
-
-    const transcriptMarkdown = await builder.generateTranscript({
-      title: episode.title,
-      description: episode.description,
-    });
-
-    // Step 6: Calculate next version number
-    await updateProgress(progressCallback, 'Saving transcript to database', 60);
-
-    const versionResult = await env.DB.prepare(
+  /**
+   * Compute the next transcript version for an episode.
+   * @param episodeId - Episode identifier
+   * @returns Incremented version number
+   */
+  private async getNextTranscriptVersion(episodeId: string): Promise<number> {
+    const versionResult = await this.env.DB.prepare(
       'SELECT MAX(version) as max_version FROM transcripts WHERE episode_id = ?'
     )
       .bind(episodeId)
       .first<{ max_version: number | null }>();
 
-    const nextVersion = (versionResult?.max_version || 0) + 1;
+    return (versionResult?.max_version ?? 0) + 1;
+  }
 
-    // Step 7: Save transcript to D1
+  /**
+   * Insert transcript metadata into D1.
+   * @param episodeId - Episode identifier
+   * @param version - Transcript version number
+   * @param body - Markdown transcript content
+   * @param wordCount - Calculated word count
+   * @returns Newly created transcript ID
+   */
+  private async insertTranscript(
+    episodeId: string,
+    version: number,
+    body: string,
+    wordCount: number
+  ): Promise<string> {
     const transcriptId = crypto.randomUUID();
-    const wordCount = builder.getWordCount();
 
-    await env.DB.prepare(
+    await this.env.DB.prepare(
       `INSERT INTO transcripts (id, episode_id, version, body, format, word_count, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)`
     )
-      .bind(transcriptId, episodeId, nextVersion, transcriptMarkdown, 'markdown', wordCount, Date.now())
+      .bind(transcriptId, episodeId, version, body, 'markdown', wordCount, Date.now())
       .run();
 
-    // Step 8: Generate audio
-    await updateProgress(progressCallback, 'Generating audio file (stub implementation)', 70);
+    return transcriptId;
+  }
 
-    const audioDirector = new AudioDirectorAgent(env);
-    const segments = builder.getTranscriptSegments().map(seg => ({
-      speaker: seg.speaker,
-      text: seg.content,
-    }));
-
-    const audioResult = await audioDirector.generateAndUploadAudio(episodeId, nextVersion, segments);
-
-    // Step 9: Save audio metadata to D1
-    await updateProgress(progressCallback, 'Saving audio metadata', 90);
-
+  /**
+   * Insert audio metadata into D1.
+   * @param episodeId - Episode identifier
+   * @param transcriptId - Associated transcript ID
+   * @param version - Version number shared with transcript
+   * @param audioResult - Uploaded audio metadata
+   * @returns Newly created audio version ID
+   */
+  private async insertAudioVersion(
+    episodeId: string,
+    transcriptId: string,
+    version: number,
+    audioResult: {
+      r2Key: string;
+      r2Url: string;
+      durationSeconds: number;
+      fileSizeBytes: number;
+    }
+  ): Promise<string> {
     const audioVersionId = crypto.randomUUID();
 
-    await env.DB.prepare(
+    await this.env.DB.prepare(
       `INSERT INTO audio_versions
        (id, episode_id, transcript_id, version, r2_key, r2_url, duration_seconds, file_size_bytes, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
@@ -148,7 +230,7 @@ export async function generatePodcastDemoWorkflow(
         audioVersionId,
         episodeId,
         transcriptId,
-        nextVersion,
+        version,
         audioResult.r2Key,
         audioResult.r2Url,
         audioResult.durationSeconds,
@@ -158,56 +240,21 @@ export async function generatePodcastDemoWorkflow(
       )
       .run();
 
-    // Step 10: Complete
-    await updateProgress(progressCallback, 'Podcast generation completed', 100);
-
-    return {
-      success: true,
-      transcriptId,
-      audioVersionId,
-    };
-  } catch (error) {
-    console.error('Podcast generation workflow error:', error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error',
-    };
+    return audioVersionId;
   }
-}
 
-/**
- * Fetch episode from database
- * @param env - Environment bindings
- * @param episodeId - Episode ID
- * @returns Episode or null
- */
-async function fetchEpisode(env: Bindings, episodeId: string): Promise<Episode | null> {
-  try {
-    const result = await env.DB.prepare('SELECT * FROM episodes WHERE id = ?')
-      .bind(episodeId)
-      .first<Episode>();
+  /**
+   * Notify listeners of workflow progress.
+   * @param step - Human-readable step description
+   * @param progress - Progress percentage (0-100)
+   */
+  private async updateProgress(step: string, progress: number): Promise<void> {
+    if (!this.progressCallback) {
+      return;
+    }
 
-    return result;
-  } catch (error) {
-    console.error('Error fetching episode:', error);
-    return null;
-  }
-}
-
-/**
- * Update progress via callback
- * @param callback - Progress callback function
- * @param step - Current step description
- * @param progress - Progress percentage (0-100)
- */
-async function updateProgress(
-  callback: ProgressCallback | undefined,
-  step: string,
-  progress: number
-): Promise<void> {
-  if (callback) {
     try {
-      await callback(step, progress);
+      await this.progressCallback(step, progress);
     } catch (error) {
       console.error('Progress callback error:', error);
     }
@@ -215,26 +262,24 @@ async function updateProgress(
 }
 
 /**
- * Trigger workflow via EpisodeActor
- * This function wraps the workflow and coordinates with the EpisodeActor
+ * Trigger workflow via EpisodeActor.
+ * This helper coordinates Durable Object state with workflow execution.
  *
  * @param env - Environment bindings
  * @param episodeId - Episode ID
- * @returns Generation result
+ * @returns Workflow execution result
  */
 export async function triggerPodcastGeneration(
   env: Bindings,
   episodeId: string
 ): Promise<PodcastGenerationResult> {
-  // Get EpisodeActor stub
   const actorId = env.EPISODE_ACTOR.idFromName(episodeId);
   const actor = env.EPISODE_ACTOR.get(actorId);
 
-  // Check if workflow is already running
   const statusResponse = await actor.fetch(
     new Request(`https://actor.internal/status?episodeId=${episodeId}`)
   );
-  const statusData = await statusResponse.json() as { success: boolean; data: any };
+  const statusData = await statusResponse.json() as { success: boolean; data: { status: string } };
 
   if (
     statusData.data.status !== 'idle' &&
@@ -243,18 +288,18 @@ export async function triggerPodcastGeneration(
   ) {
     return {
       success: false,
+      ok: false,
       error: 'Podcast generation already in progress for this episode',
     };
   }
 
-  // Start workflow
   await actor.fetch(
     new Request(`https://actor.internal/start?episodeId=${episodeId}`, {
       method: 'POST',
     })
   );
 
-  // Progress callback to update actor
+  const workflow = new GeneratePodcastDemoWorkflow(env);
   const progressCallback: ProgressCallback = async (step, progress) => {
     await actor.fetch(
       new Request(`https://actor.internal/update?episodeId=${episodeId}`, {
@@ -265,10 +310,8 @@ export async function triggerPodcastGeneration(
     );
   };
 
-  // Run the workflow
-  const result = await generatePodcastDemoWorkflow(env, episodeId, progressCallback);
+  const result = await workflow.run(episodeId, progressCallback);
 
-  // Update actor with result
   if (result.success) {
     await actor.fetch(
       new Request(`https://actor.internal/complete?episodeId=${episodeId}`, {
@@ -276,7 +319,9 @@ export async function triggerPodcastGeneration(
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           transcriptId: result.transcriptId,
+          transcriptVersion: result.transcriptVersion,
           audioVersionId: result.audioVersionId,
+          audio: result.audio,
         }),
       })
     );

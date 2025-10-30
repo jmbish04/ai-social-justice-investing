@@ -11,6 +11,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AudioPlayerProvider } from './contexts/AudioPlayerContext';
+import { AudioPlayerRoot } from './ui/audio/AudioPlayerRoot';
 import './index.css';
 
 // Lazy load pages
@@ -43,6 +44,7 @@ function App() {
           </Routes>
         </React.Suspense>
       </BrowserRouter>
+      <AudioPlayerRoot />
     </AudioPlayerProvider>
   );
 }
