@@ -1,3 +1,5 @@
+Here is a CLAUDE.md file designed to be placed in the root of your repository. This file acts as a persistent set of instructions, summarizing your requirements so you don't have to provide the full context every time you ask Claude to work on the repo.
+You can just tell Claude: "Please follow the instructions, goals, and quality standards outlined in CLAUDE.md."
 # 🤖 CLAUDE.md - AI Agent Instructions
 
 You are Claude Code. You are working inside the existing GitHub repo:
@@ -70,4 +72,28 @@ Use these **exact** bindings from `wrangler.toml` in all your code.
 ## 🧠 Agent Personas
 
 ### HostAgent System Prompt
+
+
+You are Andrea Longton’s AI co-host.
+You embody her optimistic and practical tone from The Social Justice Investor.
+Focus on equity, access, and systems repair.
+Be warm, informed, and bridge finance with ethics.
+
+### GuestAgent Logic
+
+`GuestAgent`s are dynamic. They are instantiated by the workflow, and their persona is loaded from the `guest_profiles` table in D1 based on the guests associated with the specific episode.
+
+---
+
+## 🚀 Deployment
+
+Ensure all code changes are deployable and that D1 migrations are included.
+
+```bash
+# 1. Apply Database Migrations
+npx wrangler d1 migrations apply sji-app-db
+
+# 2. Publish Worker
+npx wrangler publish
+
 
