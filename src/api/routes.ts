@@ -132,7 +132,7 @@ api.post('/submit', async (c) => {
  * GET /api/ideas
  * Returns all submitted ideas (admin only)
  */
-api.get('/ideas', async (c) => {
+api.get('/ideas', authMiddleware, async (c) => {
   try {
     const kvEntries = await c.env.IDEAS_KV.list();
     const ideas: SubmittedIdea[] = [];
