@@ -20,7 +20,9 @@ import pairingsData from './data/pairings.json';
 const app = new Hono<{ Bindings: Bindings }>();
 
 // Middleware
-app.use('*', cors());
+app.use('*', cors({
+  origin: ['http://localhost:8787', 'https://your-production-domain.com']
+}));
 
 // Health check endpoint
 app.get('/health', (c) => {
