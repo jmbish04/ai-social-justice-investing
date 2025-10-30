@@ -8,8 +8,12 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "start": "wrangler dev",
-    "build": "wrangler deploy --dry-run",
-    "tail": "wrangler tail"
+    "build": "npm run build:frontend && npm run build:worker",
+    "build:frontend": "vite build",
+    "build:worker": "wrangler deploy --dry-run",
+    "tail": "wrangler tail",
+    "db:migrate": "wrangler d1 migrations apply sji-app-db",
+    "db:migrate:local": "wrangler d1 migrations apply sji-app-db --local"
   },
   "keywords": [
     "cloudflare-workers",
@@ -21,10 +25,24 @@
   "author": "",
   "license": "MIT",
   "dependencies": {
-    "hono": "^4.0.0"
+    "hono": "^4.0.0",
+    "@hono/zod-openapi": "^0.16.0",
+    "zod": "^3.23.8",
+    "@ai-sdk/openai": "^0.0.66",
+    "ai": "^3.4.7"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20240529.0",
+    "@types/react": "^18.3.11",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.3.3",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.47",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-router-dom": "^6.26.2",
+    "tailwindcss": "^3.4.13",
+    "vite": "^5.4.10",
     "wrangler": "^3.57.0",
     "typescript": "^5.4.5"
   }

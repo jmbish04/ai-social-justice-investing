@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import { Bindings, ResearchEntry, Episode, Pairing, SubmittedIdea } from '../types/bindings';
+import { authMiddleware } from '../middleware/auth';
 import researchData from '../data/research.json';
 import episodesData from '../data/episodes.json';
 import pairingsData from '../data/pairings.json';

@@ -1,9 +1,25 @@
-name = "ai-social-justice-investing"
+name = "sji-app"
 main = "src/index.ts"
-compatibility_date = "2024-05-01"
+compatibility_date = "2025-10-30"
 compatibility_flags = ["nodejs_compat"]
 
-# KV Namespaces for dynamic content storage
+# D1 Database for structured data
+[[d1_databases]]
+binding = "DB"
+database_name = "sji-app-db"
+database_id = "34b476f8-1f88-4062-816d-2acfb3449a7d"
+
+# R2 Bucket for audio files and transcripts
+[[r2_buckets]]
+binding = "BUCKET"
+bucket_name = "sji-app-public"
+
+# KV Namespace for session and ephemeral chat memory
+[[kv_namespaces]]
+binding = "KV"
+id = "ae22b132a2fd453ca9cc04c1ab3b0da9"
+
+# Legacy KV Namespaces (preserved for backward compatibility)
 [[kv_namespaces]]
 binding = "IDEAS_KV"
 id = "your-ideas-kv-namespace-id"
@@ -14,26 +30,45 @@ binding = "RESEARCH_KV"
 id = "your-research-kv-namespace-id"
 preview_id = "your-research-kv-preview-id"
 
+# Durable Objects
+[[durable_objects.bindings]]
+name = "CHAT_COORDINATOR"
+class_name = "ChatCoordinatorDO"
+script_name = "sji-app"
+
+[[durable_objects.bindings]]
+name = "EPISODE_ACTOR"
+class_name = "EpisodeActor"
+script_name = "sji-app"
+
+# Migrations for Durable Objects
+[[migrations]]
+tag = "v1"
+new_classes = ["ChatCoordinatorDO", "EpisodeActor"]
+
 # Environment variables
 [vars]
 ENVIRONMENT = "production"
+R2_PUBLIC_URL = "https://sji-app-public.b3304b14848de15c72c24a14b0cd187d.r2.dev"
+MODEL_REASONING = "@cf/meta/llama-3.1-8b-instruct"
+MODEL_STT = "@cf/openai/whisper-base-en"
 
 # Secrets (set via: wrangler secret put ADMIN_TOKEN)
 # ADMIN_TOKEN = "your-secret-token-here"
 
-# Optional: D1 Database (SQLite) for future use
-# [[d1_databases]]
-# binding = "DB"
-# database_name = "ai-justice-db"
-# database_id = "your-database-id"
+# Assets binding for static frontend files
+[assets]
+directory = "./dist"
+binding = "ASSETS"
 
 # Build configuration
 [build]
-command = ""
+command = "npm run build:frontend"
 
 # Local development settings
 [env.dev]
-name = "ai-social-justice-investing-dev"
+name = "sji-app-dev"
 
 [env.dev.vars]
 ENVIRONMENT = "development"
+R2_PUBLIC_URL = "http://localhost:8787"
