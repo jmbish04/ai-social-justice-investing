@@ -100,8 +100,7 @@ export function EpisodeView({ episodeId }: EpisodeViewProps): JSX.Element {
     return () => {
       pollCancelRef.current?.();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [episodeId]);
+  }, [refreshAll]);
 
   useEffect(() => {
     if (transcripts.length > 0 && !selectedTranscriptId) {
