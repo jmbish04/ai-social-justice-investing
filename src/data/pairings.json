@@ -1,0 +1,47 @@
+[
+  {
+    "id": "p001",
+    "guestName": "Joy Buolamwini",
+    "authorName": "Andrea Barrica",
+    "chemistry": ["Visionary", "Tech-Forward", "Storyteller"],
+    "topic": "The Coded Gaze: How AI Sees (and Misses) Marginalized Communities",
+    "reasoning": "Joy's groundbreaking work on algorithmic bias pairs perfectly with Andrea's insights on inclusive tech entrepreneurship. Both bring firsthand experience building tools that center equity.",
+    "confidenceScore": 95
+  },
+  {
+    "id": "p002",
+    "guestName": "Ruha Benjamin",
+    "authorName": "Josh Levin",
+    "chemistry": ["Critical Thinker", "Historian", "Systems-Level"],
+    "topic": "The New Jim Code Meets Impact Investing",
+    "reasoning": "Ruha's academic rigor on race and technology complements Josh's framework for values-driven capital allocation. Expect a conversation that bridges theory and practice.",
+    "confidenceScore": 88
+  },
+  {
+    "id": "p003",
+    "guestName": "Timnit Gebru",
+    "authorName": "Janine Firpo",
+    "chemistry": ["Truth-Teller", "Field Practitioner", "Global Perspective"],
+    "topic": "AI Accountability in Microfinance and Emerging Markets",
+    "reasoning": "Timnit's fearless advocacy for AI ethics meets Janine's decades of microfinance experience. This pairing explores how AI impacts financial inclusion in the Global South.",
+    "confidenceScore": 92
+  },
+  {
+    "id": "p004",
+    "guestName": "Safiya Noble",
+    "authorName": "Morgan Simon",
+    "chemistry": ["Analytical", "Activist", "Movement-Builder"],
+    "topic": "Search Algorithms, Investment Algorithms, and the Politics of Visibility",
+    "reasoning": "Safiya's work on search engine bias connects to Morgan's strategies for making impact capital visible and accessible to marginalized founders.",
+    "confidenceScore": 85
+  },
+  {
+    "id": "p005",
+    "guestName": "Cathy O'Neil",
+    "authorName": "Fran Seegull",
+    "chemistry": ["Pragmatist", "Data-Driven", "Solutions-Oriented"],
+    "topic": "Auditing the Black Box: Making Financial AI Explainable",
+    "reasoning": "Cathy's expertise in algorithmic accountability and Fran's work on impact measurement create a powerful dialogue on transparency in AI-driven investing.",
+    "confidenceScore": 90
+  }
+]

@@ -1,0 +1,39 @@
+name = "ai-social-justice-investing"
+main = "src/index.ts"
+compatibility_date = "2024-05-01"
+compatibility_flags = ["nodejs_compat"]
+
+# KV Namespaces for dynamic content storage
+[[kv_namespaces]]
+binding = "IDEAS_KV"
+id = "your-ideas-kv-namespace-id"
+preview_id = "your-ideas-kv-preview-id"
+
+[[kv_namespaces]]
+binding = "RESEARCH_KV"
+id = "your-research-kv-namespace-id"
+preview_id = "your-research-kv-preview-id"
+
+# Environment variables
+[vars]
+ENVIRONMENT = "production"
+
+# Secrets (set via: wrangler secret put ADMIN_TOKEN)
+# ADMIN_TOKEN = "your-secret-token-here"
+
+# Optional: D1 Database (SQLite) for future use
+# [[d1_databases]]
+# binding = "DB"
+# database_name = "ai-justice-db"
+# database_id = "your-database-id"
+
+# Build configuration
+[build]
+command = ""
+
+# Local development settings
+[env.dev]
+name = "ai-social-justice-investing-dev"
+
+[env.dev.vars]
+ENVIRONMENT = "development"
