@@ -135,18 +135,18 @@ api.post('/submit', authMiddleware, async (c) => {
 api.get('/ideas', authMiddleware, async (c) => {
   try {
     const kvEntries = await c.env.IDEAS_KV.list();
-    const ideas: SubmittedIdea[] = [];
-
-    for (const key of kvEntries.keys) {
+    const promises = kvEntries.keys.map(async (key) => {
       const value = await c.env.IDEAS_KV.get(key.name);
       if (value) {
         try {
-          ideas.push(JSON.parse(value));
+          return JSON.parse(value) as SubmittedIdea;
         } catch (e) {
           console.error(`Failed to parse idea ${key.name}:`, e);
         }
       }
-    }
+      return null;
+    });
+    const ideas = (await Promise.all(promises)).filter((idea): idea is SubmittedIdea => idea !== null);
 
     // Sort by timestamp (newest first)
     ideas.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
