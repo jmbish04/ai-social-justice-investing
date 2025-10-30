@@ -14,18 +14,18 @@ api.get('/research', async (c) => {
   try {
     // In production, you might fetch additional entries from RESEARCH_KV
     const kvEntries = await c.env.RESEARCH_KV.list();
-    const additionalResearch: ResearchEntry[] = [];
-
-    for (const key of kvEntries.keys) {
+    const promises = kvEntries.keys.map(async (key) => {
       const value = await c.env.RESEARCH_KV.get(key.name);
       if (value) {
         try {
-          additionalResearch.push(JSON.parse(value));
+          return JSON.parse(value) as ResearchEntry;
         } catch (e) {
           console.error(`Failed to parse research entry ${key.name}:`, e);
         }
       }
-    }
+      return null;
+    });
+    const additionalResearch = (await Promise.all(promises)).filter((entry): entry is ResearchEntry => entry !== null);
 
     const allResearch = [...researchData, ...additionalResearch];
 
