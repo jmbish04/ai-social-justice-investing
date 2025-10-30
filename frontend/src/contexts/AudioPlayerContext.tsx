@@ -93,7 +93,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
       audio.addEventListener('timeupdate', handleTimeUpdate);
       audio.addEventListener('durationchange', handleDurationChange);
       audio.addEventListener('ended', handleEnded);
-      audio.addEventListener('error', handleError as any);
+      audio.addEventListener('error', handleError);
 
       return () => {
         audio.removeEventListener('timeupdate', handleTimeUpdate);
