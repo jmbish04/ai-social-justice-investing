@@ -41,7 +41,7 @@ type WavInfo = {
   pcm: Uint8Array; // raw PCM little-endian
 };
 
-const DEFAULT_MODEL = "@cf/myshell-ai/melotts";
+const DEFAULT_MODEL = env.MODEL_VOICE_GEN;
 const DEFAULT_GAP_MS = 150;
 
 /**
