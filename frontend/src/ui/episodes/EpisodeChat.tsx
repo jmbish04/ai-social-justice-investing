@@ -32,6 +32,40 @@ export function EpisodeChat({ episodeId, episodeTitle }: EpisodeChatProps): JSX.
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
 
+  const loadMessages = useCallback(async (id: string) => {
+    try {
+      const response = await fetch(`/api/threads/${id}/messages`);
+      const data = await response.json();
+      if (data.success) {
+        setMessages(data.data as Message[]);
+      }
+    } catch (error) {
+      console.error('Failed to load episode chat messages:', error);
+    }
+  }, []); // setMessages is stable and doesn't need to be a dependency
+
+  const createThread = useCallback(async () => {
+    try {
+      const response = await fetch('/api/threads', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: `Episode ${episodeTitle}` }),
+      });
+      const data = await response.json();
+      if (data.success) {
+        const newThreadId = data.data.id;
+        setThreadId(newThreadId);
+        if (typeof window !== 'undefined') {
+          localStorage.setItem(`${THREAD_STORAGE_PREFIX}${episodeId}`, newThreadId);
+        }
+        // Load messages after creating the thread
+        await loadMessages(newThreadId);
+      }
+    } catch (error) {
+      console.error('Failed to create episode chat thread:', error);
+    }
+  }, [episodeId, episodeTitle, loadMessages]); // setThreadId is stable
+
   useEffect(() => {
     const storedThread = typeof window !== 'undefined'
       ? localStorage.getItem(`${THREAD_STORAGE_PREFIX}${episodeId}`)
@@ -43,39 +77,7 @@ export function EpisodeChat({ episodeId, episodeTitle }: EpisodeChatProps): JSX.
     } else {
       void createThread();
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [episodeId]);
-
-  const createThread = async () => {
-    try {
-      const response = await fetch('/api/threads', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: `Episode ${episodeTitle}` }),
-      });
-      const data = await response.json();
-      if (data.success) {
-        setThreadId(data.data.id);
-        if (typeof window !== 'undefined') {
-          localStorage.setItem(`${THREAD_STORAGE_PREFIX}${episodeId}`, data.data.id);
-        }
-      }
-    } catch (error) {
-      console.error('Failed to create episode chat thread:', error);
-    }
-  };
-
-  const loadMessages = async (id: string) => {
-    try {
-      const response = await fetch(`/api/threads/${id}/messages`);
-      const data = await response.json();
-      if (data.success) {
-        setMessages(data.data as Message[]);
-      }
-    } catch (error) {
-      console.error('Failed to load episode chat messages:', error);
-    }
-  };
+  }, [episodeId, createThread, loadMessages]);
 
   const sendMessage = async () => {
     if (!threadId || !input.trim()) {
