@@ -80,6 +80,35 @@ export class AudioDirectorAgent {
   }
 
   /**
+   * Generate an in-memory audio placeholder for a full transcript.
+   * The result mimics what a future TTS pipeline would return while keeping
+   * the rest of the workflow interface stable.
+   *
+   * @param transcriptText - Full transcript content to convert into audio
+   * @returns Placeholder audio buffer with lightweight metadata
+   */
+  async generateAudio(
+    transcriptText: string
+  ): Promise<{ buffer: ArrayBuffer; meta: { durationSeconds: number; wordCount: number } }> {
+    const normalized = transcriptText.trim();
+    const wordCount = normalized.length > 0 ? normalized.split(/\s+/).length : 0;
+    const durationSeconds = this.estimateDuration(normalized);
+
+    const payload = {
+      type: 'podcast-audio-placeholder',
+      generatedAt: new Date().toISOString(),
+      durationSeconds,
+      wordCount,
+      preview: normalized.substring(0, 400),
+      note: 'Replace with Workers AI TTS output when available.',
+    };
+
+    const buffer = new TextEncoder().encode(JSON.stringify(payload, null, 2)).buffer;
+
+    return { buffer, meta: { durationSeconds, wordCount } };
+  }
+
+  /**
    * Generate audio for individual transcript segments
    * NOTE: This is a stub implementation. Real TTS would use:
    * - Cloudflare AI TTS models (when available)

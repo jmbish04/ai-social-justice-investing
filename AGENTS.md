@@ -67,6 +67,53 @@ Use these **exact** bindings from `wrangler.toml` in all your code.
 
 ---
 
+## 🎛 Backend Components
+
+### PodcastBuilderAgent (`src/agents/PodcastBuilderAgent.ts`)
+- Coordinates Host and Guest agents to create structured multi-speaker transcripts.
+- `generateTranscriptPackage` returns markdown text, resolved outline, transcript segments, and word count for workflow consumers.
+- Static factory `createForEpisode` loads guest personas from D1.
+
+### AudioDirectorAgent (`src/agents/AudioDirectorAgent.ts`)
+- Produces placeholder audio metadata while Workers AI TTS is unavailable.
+- `generateAudio` returns an in-memory buffer + metadata, and `generateAndUploadAudio` stores concatenated segments in R2.
+
+### GeneratePodcastDemoWorkflow (`src/workflows/generatePodcastDemo.ts`)
+- Class-based orchestrator with `run(episodeId)` that persists transcripts in D1, uploads audio to R2, and reports progress.
+- Returns `{ ok, success, transcriptId, transcriptVersion, transcriptWordCount, audioVersionId, audio }` for API consumers.
+
+### EpisodeActor (`src/actors/EpisodeActor.ts`)
+- Durable Object providing serialized workflow execution and status polling.
+- Persists `transcriptVersion` plus audio metadata in `state.result` for client polling.
+
+### API Route (`POST /api/episodes/:id/generate-audio`)
+- Defined in `src/api/newRoutes.ts` (mounted via `src/index.ts`).
+- Calls `triggerPodcastGeneration` and responds with the workflow payload described above.
+
+### Database Migrations
+- `migrations/2025-10-30_add_podcast_tables.sql` defines `transcripts` and `audio_versions` tables with versioning, metadata, and indexes.
+
+### API Extensions
+- `GET /api/episodes/:id/transcripts` / `POST` / `PATCH` provide transcript management.
+- `GET /api/episodes/:id/audio-versions` exposes R2 audio metadata.
+- `GET /api/episodes/:id/workflow-status` proxies the `EpisodeActor` state for polling.
+- `DELETE /api/episodes/:id/guests/:guestId` removes guest assignments.
+
+### Frontend UI
+- `frontend/src/ui/audio/AudioPlayerRoot.tsx` renders the persistent playback bar powered by `useAudioPlayer`.
+- `frontend/src/ui/episodes/EpisodeView.tsx` orchestrates transcript editing, audio playback, and guest coordination.
+- Supporting components (`ProgressOverlay`, `VersionSelector`, `StatusBadge`, `GuestManager`, `TranscriptEditor`, `EpisodeChat`) live under `frontend/src/ui/` and should be reused where possible.
+- `frontend/src/ui/brainstorm/BrainstormChat.tsx` encapsulates brainstorm flow with episode promotion actions.
+
+### Testing
+- `npm run test` executes the Vitest suite.
+- `src/tests/generatePodcastDemoWorkflow.test.ts` validates transcript versioning, audio metadata persistence, and workflow error handling with an in-memory D1 mock.
+- `frontend/src/contexts/__tests__/AudioPlayerContext.test.tsx` verifies audio player persistence and localStorage syncing for the React UI.
+
+- Test setup stubs live audio playback via `vitest.setup.ts`.
+
+---
+
 ## 🧠 Agent Personas
 
 ### HostAgent System Prompt

@@ -10,6 +10,8 @@
 
 import React, { createContext, useContext, useState, useRef, useEffect } from 'react';
 
+const STORAGE_KEY = 'sji.audioPlayer.v1';
+
 /**
  * Audio player state interface
  */
@@ -64,48 +66,101 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
-  // Initialize audio element
+  // Initialize audio element and restore persisted state
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      audioRef.current = new Audio();
-      audioRef.current.preload = 'metadata';
-
-      // Event listeners
-      const audio = audioRef.current;
-
-      const handleTimeUpdate = () => {
-        setState((prev) => ({ ...prev, currentTime: audio.currentTime }));
-      };
-
-      const handleDurationChange = () => {
-        setState((prev) => ({ ...prev, duration: audio.duration }));
-      };
-
-      const handleEnded = () => {
-        setState((prev) => ({ ...prev, isPlaying: false, currentTime: 0 }));
-      };
-
-      const handleError = () => {
-        if (audioRef.current?.error) {
-          console.error('Audio playback error:', audioRef.current.error);
-          setState((prev) => ({ ...prev, isPlaying: false }));
-        }
-      };
-
-      audio.addEventListener('timeupdate', handleTimeUpdate);
-      audio.addEventListener('durationchange', handleDurationChange);
-      audio.addEventListener('ended', handleEnded);
-      audio.addEventListener('error', handleError);
-
-      return () => {
-        audio.removeEventListener('timeupdate', handleTimeUpdate);
-        audio.removeEventListener('durationchange', handleDurationChange);
-        audio.removeEventListener('ended', handleEnded);
-        audio.removeEventListener('error', handleError as any);
-        audio.pause();
-      };
+    if (typeof window === 'undefined') {
+      return;
     }
+
+    const audio = new Audio();
+    audio.preload = 'metadata';
+    audioRef.current = audio;
+
+    const persistedRaw = localStorage.getItem(STORAGE_KEY);
+    if (persistedRaw) {
+      try {
+        const persisted = JSON.parse(persistedRaw) as {
+          currentTrack?: AudioPlayerState['currentTrack'];
+          currentTime?: number;
+          volume?: number;
+        };
+
+        setState((prev) => ({
+          ...prev,
+          currentTrack: persisted.currentTrack || null,
+          currentTime: persisted.currentTime || 0,
+          volume: typeof persisted.volume === 'number' ? persisted.volume : prev.volume,
+        }));
+
+        if (persisted.currentTrack) {
+          audio.src = persisted.currentTrack.audioUrl;
+          audio.currentTime = persisted.currentTime || 0;
+        }
+
+        audio.volume = typeof persisted.volume === 'number' ? persisted.volume : audio.volume;
+      } catch (error) {
+        console.warn('Failed to restore audio player state:', error);
+      }
+    }
+
+    const handleTimeUpdate = () => {
+      setState((prev) => ({ ...prev, currentTime: audio.currentTime }));
+    };
+
+    const handleDurationChange = () => {
+      setState((prev) => ({ ...prev, duration: audio.duration }));
+    };
+
+    const handleEnded = () => {
+      setState((prev) => ({ ...prev, isPlaying: false, currentTime: 0 }));
+    };
+
+    const handleError = () => {
+      if (audioRef.current?.error) {
+        console.error('Audio playback error:', audioRef.current.error);
+        setState((prev) => ({ ...prev, isPlaying: false }));
+      }
+    };
+
+    audio.addEventListener('timeupdate', handleTimeUpdate);
+    audio.addEventListener('durationchange', handleDurationChange);
+    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener('error', handleError);
+
+    return () => {
+      audio.removeEventListener('timeupdate', handleTimeUpdate);
+      audio.removeEventListener('durationchange', handleDurationChange);
+      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener('error', handleError as any);
+      audio.pause();
+    };
   }, []);
+
+  // Persist state updates
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    const payload = {
+      currentTrack: state.currentTrack,
+      currentTime: state.currentTrack ? state.currentTime : 0,
+      volume: state.volume,
+    };
+
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(payload));
+    } catch (error) {
+      console.warn('Failed to persist audio player state:', error);
+    }
+  }, [state.currentTrack, state.currentTime, state.volume]);
+
+  // Keep audio element volume aligned with state
+  useEffect(() => {
+    if (audioRef.current) {
+      audioRef.current.volume = state.volume;
+    }
+  }, [state.volume]);
 
   /**
    * Play a new track
@@ -119,6 +174,7 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
     if (state.currentTrack?.audioUrl !== track.audioUrl) {
       audio.src = track.audioUrl;
       audio.load();
+      audio.currentTime = 0;
     }
 
     audio
@@ -208,43 +264,6 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
   return (
     <AudioPlayerContext.Provider value={value}>
       {children}
-      {/* Persistent audio player UI */}
-      {state.currentTrack && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 shadow-lg z-50">
-          <div className="max-w-7xl mx-auto px-4 py-3">
-            <div className="flex items-center gap-4">
-              <button
-                onClick={state.isPlaying ? pause : resume}
-                className="btn-primary"
-              >
-                {state.isPlaying ? '⏸️ Pause' : '▶️ Play'}
-              </button>
-              <div className="flex-1">
-                <div className="text-sm font-medium">{state.currentTrack.episodeTitle}</div>
-                <div className="text-xs text-gray-500">
-                  Version {state.currentTrack.version}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm">
-                  {formatTime(state.currentTime)} / {formatTime(state.duration)}
-                </span>
-                <input
-                  type="range"
-                  min="0"
-                  max={state.duration || 0}
-                  value={state.currentTime}
-                  onChange={(e) => seek(parseFloat(e.target.value))}
-                  className="w-32"
-                />
-                <button onClick={stop} className="text-gray-500 hover:text-gray-700">
-                  ✕
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
     </AudioPlayerContext.Provider>
   );
 }
@@ -252,20 +271,10 @@ export function AudioPlayerProvider({ children }: { children: React.ReactNode })
 /**
  * Hook to use audio player context
  */
-export function useAudioPlayer() {
+export function useAudioPlayerContext() {
   const context = useContext(AudioPlayerContext);
   if (!context) {
-    throw new Error('useAudioPlayer must be used within AudioPlayerProvider');
+    throw new Error('useAudioPlayerContext must be used within AudioPlayerProvider');
   }
   return context;
-}
-
-/**
- * Format time in MM:SS
- */
-function formatTime(seconds: number): string {
-  if (!isFinite(seconds)) return '0:00';
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }

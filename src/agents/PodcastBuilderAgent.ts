@@ -160,6 +160,32 @@ Focus on 3-5 main segments that explore social justice, AI ethics, and financial
   }
 
   /**
+   * Generate a structured transcript package that includes metadata needed by downstream workflows.
+   * @param episode - Episode metadata used for prompt context
+   * @param outline - Optional precomputed outline to avoid regenerating one
+   * @returns Object containing markdown transcript text, resolved outline, transcript segments, and word count
+   */
+  async generateTranscriptPackage(
+    episode: { title: string; description: string },
+    outline?: EpisodeOutline
+  ): Promise<{
+    text: string;
+    outline: EpisodeOutline;
+    segments: TranscriptSegment[];
+    wordCount: number;
+  }> {
+    const resolvedOutline = outline ?? (await this.generateOutline(episode));
+    const text = await this.generateTranscript(episode, resolvedOutline);
+
+    return {
+      text,
+      outline: resolvedOutline,
+      segments: this.getTranscriptSegments().map(segment => ({ ...segment })),
+      wordCount: this.getWordCount(),
+    };
+  }
+
+  /**
    * Generate opening segment
    */
   private async generateOpening(

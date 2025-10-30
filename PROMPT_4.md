@@ -85,6 +85,10 @@ src/ui/
 ├── VersionSelector.tsx
 └── StatusBadge.tsx
 
+These files are present and synchronized with the backend endpoints added in
+PROMPT_3 (transcript/audio listings and workflow status). Extend rather than
+replace them.
+
 - All frontend assets are served via the `ASSETS` binding.
 - Use the existing Hono `/api` routes for all persistence.
 - Use your `cloudflare-docs` MCP to confirm correct streaming/chat SDK imports and Worker asset bundling patterns.
@@ -149,6 +153,7 @@ Claude should:
 	3.	Commit and push changes in logical increments.
 	4.	Ensure /brainstorm and /episodes/:id render complete, functional UI flows.
 	5.	Confirm AudioPlayerRoot functions seamlessly on iOS Safari.
+	6.	Run `npm run test` to execute Vitest suites covering workflow and audio persistence.
 
 Once complete, the repo should support end-to-end creation, editing, generation, and playback of podcast demos with multiple guests — powered entirely by Cloudflare Workers and Vercel SDKs.
 

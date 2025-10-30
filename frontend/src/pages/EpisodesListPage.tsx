@@ -6,12 +6,14 @@
 
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { StatusBadge, StatusVariant } from '../ui/components/StatusBadge';
 
 interface Episode {
   id: string;
   title: string;
   description: string | null;
   created_at: number;
+  status?: StatusVariant;
 }
 
 export default function EpisodesListPage() {
@@ -69,6 +71,9 @@ export default function EpisodesListPage() {
                   {episode.description}
                 </p>
               )}
+              <div className="mt-3">
+                {episode.status && <StatusBadge status={episode.status} />}
+              </div>
               <div className="mt-4 text-sm text-gray-500">
                 Created: {new Date(episode.created_at).toLocaleDateString()}
               </div>
