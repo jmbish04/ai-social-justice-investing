@@ -107,7 +107,7 @@ api.post('/submit', authMiddleware, async (c) => {
     }
 
     const idea: SubmittedIdea = {
-      id: `idea-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: crypto.randomUUID(),
       content,
       type: type || 'general',
       timestamp: new Date().toISOString(),
