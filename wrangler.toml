@@ -22,13 +22,12 @@ id = "ae22b132a2fd453ca9cc04c1ab3b0da9"
 # Legacy KV Namespaces (preserved for backward compatibility)
 [[kv_namespaces]]
 binding = "IDEAS_KV"
-id = "your-ideas-kv-namespace-id"
-preview_id = "your-ideas-kv-preview-id"
+id = "b7bbdd09b9b2431286eabca8cffd2abe"
+
 
 [[kv_namespaces]]
 binding = "RESEARCH_KV"
-id = "your-research-kv-namespace-id"
-preview_id = "your-research-kv-preview-id"
+id = "d93026f2fa3c40ff8048abc0ab05835e"
 
 # Durable Objects
 [[durable_objects.bindings]]
@@ -50,8 +49,10 @@ new_classes = ["ChatCoordinatorDO", "EpisodeActor"]
 [vars]
 ENVIRONMENT = "production"
 R2_PUBLIC_URL = "https://sji-app-public.b3304b14848de15c72c24a14b0cd187d.r2.dev"
-MODEL_REASONING = "@cf/meta/llama-3.1-8b-instruct"
-MODEL_STT = "@cf/openai/whisper-base-en"
+MODEL_REASONING = "@cf/openai/gpt-oss-120b"
+MODEL_STT = "@cf/openai/whisper-large-v3-turbo" #Accurate, multilingual ASR
+MODEL_VOICE_GEN = "@cf/myshell-ai/melotts" #Multi-speaker TTS, cheap + fast
+MODEL_SPEAKER_DETECT = "@cf/pipecat-ai/smart-turn-v2" #Realtime turn segmentation
 
 # Secrets (set via: wrangler secret put ADMIN_TOKEN)
 # ADMIN_TOKEN = "your-secret-token-here"
