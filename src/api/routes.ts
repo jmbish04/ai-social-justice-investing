@@ -94,7 +94,7 @@ api.get('/pairings', async (c) => {
  * Saves a new idea to KV storage
  * Requires authentication
  */
-api.post('/submit', async (c) => {
+api.post('/submit', authMiddleware, async (c) => {
   try {
     const body = await c.req.json();
     const { content, type } = body;
