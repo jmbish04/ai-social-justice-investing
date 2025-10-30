@@ -1,6 +1,4 @@
-Here is a CLAUDE.md file designed to be placed in the root of your repository. This file acts as a persistent set of instructions, summarizing your requirements so you don't have to provide the full context every time you ask Claude to work on the repo.
-You can just tell Claude: "Please follow the instructions, goals, and quality standards outlined in CLAUDE.md."
-# 🤖 CLAUDE.md - AI Agent Instructions
+# 🤖 AGENTS.md - AI Agent Instructions
 
 You are Claude Code. You are working inside the existing GitHub repo:
 **https://github.com/jmbish04/ai-social-justice-investing**
