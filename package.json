@@ -8,7 +8,7 @@
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
     "start": "wrangler dev",
-    "build": "vite build && wrangler deploy --dry-run",
+    "build": "npm run build:frontend && npm run build:worker",
     "build:frontend": "vite build",
     "build:worker": "wrangler deploy --dry-run",
     "tail": "wrangler tail",
