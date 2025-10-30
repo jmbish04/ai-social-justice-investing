@@ -3,6 +3,7 @@ import { cors } from 'hono/cors';
 import { Bindings } from './types/bindings';
 import { authMiddleware } from './middleware/auth';
 import apiRoutes from './api/routes';
+import newApiRoutes from './api/newRoutes';
 
 // Import page renderers
 import { homePage } from './pages/home';
@@ -15,6 +16,10 @@ import { submitPage } from './pages/submit';
 import episodesData from './data/episodes.json';
 import researchData from './data/research.json';
 import pairingsData from './data/pairings.json';
+
+// Export Durable Objects for Cloudflare Workers
+export { ChatCoordinatorDO } from './do/ChatCoordinatorDO';
+export { EpisodeActor } from './actors/EpisodeActor';
 
 // Create Hono app with type-safe bindings
 const app = new Hono<{ Bindings: Bindings }>();
@@ -77,12 +82,7 @@ app.get('/submit', (c) => {
 
 // API Routes
 app.route('/api', apiRoutes);
-
-// Protected API endpoint with authentication
-app.post('/api/submit', authMiddleware, async (c) => {
-  // This route is already handled in apiRoutes, but we add auth middleware here
-  return c.json({ error: 'This endpoint should be handled by the API router' }, 500);
-});
+app.route('/api', newApiRoutes);
 
 // 404 Handler
 app.notFound((c) => {
