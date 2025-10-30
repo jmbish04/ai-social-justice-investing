@@ -1,0 +1,42 @@
+[
+  {
+    "id": "e001",
+    "title": "The Algorithmic Class Divide",
+    "description": "How redlining turned into algorithmic bias. Exploring the historical roots of discriminatory lending practices and their modern AI-powered manifestations in credit scoring and mortgage approval systems.",
+    "guest": "AI ethicist + impact investor",
+    "status": "planned",
+    "dateCreated": "2025-10-10"
+  },
+  {
+    "id": "e002",
+    "title": "Investing in Liberation: AI as a Tool for Economic Justice",
+    "description": "Can machine learning models be used to identify and fund underserved communities? A conversation about using AI to democratize access to capital.",
+    "guest": "Data scientist + community investment fund director",
+    "status": "planned",
+    "dateCreated": "2025-10-12"
+  },
+  {
+    "id": "e003",
+    "title": "The Ghost in the Machine: Bias Audits for Financial AI",
+    "description": "Deep dive into fairness testing frameworks, intersectional bias detection, and the regulatory landscape for AI in finance.",
+    "guest": "Fair lending compliance expert + ML researcher",
+    "status": "planned",
+    "dateCreated": "2025-10-14"
+  },
+  {
+    "id": "e004",
+    "title": "Decolonizing Data: Who Owns the Training Sets?",
+    "description": "Examining data extraction, consent, and ownership in AI systems used for credit and risk assessment in the Global South.",
+    "guest": "Digital rights advocate + impact investor",
+    "status": "planned",
+    "dateCreated": "2025-10-16"
+  },
+  {
+    "id": "e005",
+    "title": "From Payday Loans to Prediction Markets: AI and Financial Predation",
+    "description": "How AI-powered fintech can either exploit or empower vulnerable populations. Case studies from predatory lending detection systems.",
+    "guest": "Consumer protection attorney + fintech founder",
+    "status": "planned",
+    "dateCreated": "2025-10-18"
+  }
+]

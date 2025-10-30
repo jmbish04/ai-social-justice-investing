@@ -1,0 +1,47 @@
+[
+  {
+    "id": "r001",
+    "name": "Joy Buolamwini",
+    "domain": "AI Ethics",
+    "chemistry": "Visionary",
+    "topic": "Algorithmic Justice and Financial Equity",
+    "link": "https://www.ajlunited.org",
+    "dateAdded": "2025-10-15"
+  },
+  {
+    "id": "r002",
+    "name": "Ruha Benjamin",
+    "domain": "Science & Technology Studies",
+    "chemistry": "Critical Thinker",
+    "topic": "Race After Technology: Abolitionist Tools for the New Jim Code",
+    "link": "https://www.ruhabenjamin.com",
+    "dateAdded": "2025-10-16"
+  },
+  {
+    "id": "r003",
+    "name": "Timnit Gebru",
+    "domain": "AI Research",
+    "chemistry": "Truth-Teller",
+    "topic": "Data Colonialism and AI Accountability",
+    "link": "https://www.dair-institute.org",
+    "dateAdded": "2025-10-18"
+  },
+  {
+    "id": "r004",
+    "name": "Safiya Noble",
+    "domain": "Information Studies",
+    "chemistry": "Analytical",
+    "topic": "Algorithms of Oppression: How Search Engines Reinforce Racism",
+    "link": "https://safiyaunoble.com",
+    "dateAdded": "2025-10-20"
+  },
+  {
+    "id": "r005",
+    "name": "Cathy O'Neil",
+    "domain": "Data Science",
+    "chemistry": "Pragmatist",
+    "topic": "Weapons of Math Destruction: How Big Data Increases Inequality",
+    "link": "https://mathbabe.org",
+    "dateAdded": "2025-10-22"
+  }
+]
