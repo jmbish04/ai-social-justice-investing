@@ -17,9 +17,12 @@ export async function authMiddleware(c: Context<{ Bindings: Bindings }>, next: N
   // Check Authorization header
   const authHeader = c.req.header('Authorization');
   if (authHeader) {
-    const token = authHeader.replace('Bearer ', '');
-    if (token === adminToken) {
-      return next();
+    const parts = authHeader.split(' ');
+    if (parts.length === 2 && parts[0] === 'Bearer') {
+      const token = parts[1];
+      if (token === adminToken) {
+        return next();
+      }
     }
   }
 
