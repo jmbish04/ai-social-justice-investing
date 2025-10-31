@@ -6,7 +6,8 @@
   "type": "module",
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "npm run build && npm run db:migrate && wrangler versions deploy",
+    "deploy": "npm run build && npm run db:migrate && wrangler deploy",
+    "deploy:non-prod": "npm run build && npm run db:migrate && wrangler versions deploy",
     "start": "wrangler dev",
     "build": "npm run build:frontend && npm run build:worker",
     "build:frontend": "vite build",
