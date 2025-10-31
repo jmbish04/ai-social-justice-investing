@@ -33,12 +33,12 @@ id = "d93026f2fa3c40ff8048abc0ab05835e"
 [[durable_objects.bindings]]
 name = "CHAT_COORDINATOR"
 class_name = "ChatCoordinatorDO"
-script_name = "sji-app"
+# script_name = "sji-app" # Optional. Defaults to the current environment's Worker code.
 
 [[durable_objects.bindings]]
 name = "EPISODE_ACTOR"
 class_name = "EpisodeActor"
-script_name = "sji-app"
+# script_name = "sji-app" # Optional. Defaults to the current environment's Worker code.
 
 # Migrations for Durable Objects
 [[migrations]]
@@ -48,7 +48,7 @@ new_classes = ["ChatCoordinatorDO", "EpisodeActor"]
 # Environment variables
 [vars]
 ENVIRONMENT = "production"
-R2_PUBLIC_URL = "https://sji-app-public.b3304b14848de15c72c24a14b0cd187d.r2.dev"
+R2_PUBLIC_URL = "https://pub-74ee393e7d5d490aa0ea0c5590f79b06.r2.dev"
 MODEL_REASONING = "@cf/openai/gpt-oss-120b"
 MODEL_STT = "@cf/openai/whisper-large-v3-turbo" #Accurate, multilingual ASR
 MODEL_VOICE_GEN = "@cf/myshell-ai/melotts" #Multi-speaker TTS, cheap + fast
