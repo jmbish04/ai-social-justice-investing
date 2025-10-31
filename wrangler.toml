@@ -1,4 +1,4 @@
-name = "sji-app"
+name = 'social-investing'
 main = "src/index.ts"
 compatibility_date = "2025-10-30"
 compatibility_flags = ["nodejs_compat"]
