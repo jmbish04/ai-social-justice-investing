@@ -216,7 +216,7 @@ def build_guest_profiles(table: Dict[str, Dict[str, str]], details: Dict[str, Di
         background = ' | '.join(background_parts) or None
         spec = GuestProfileSpec(
             name=name,
-            persona_description=persona_description or (summary or rationale or ''),
+            persona_description=persona_description,
             expertise=domain,
             tone=chemistry,
             background=background,
