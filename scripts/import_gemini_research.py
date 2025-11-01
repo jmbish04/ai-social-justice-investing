@@ -401,7 +401,7 @@ def main(argv: Optional[List[str]] = None) -> int:
         print(f"Research file not found at {research_path}", file=sys.stderr)
         return 1
 
-    guests, _, episodes = load_research(research_path)
+    guests, episodes = load_research(research_path)
     if not episodes:
         print('No episode definitions could be parsed from the research file.', file=sys.stderr)
         return 1
