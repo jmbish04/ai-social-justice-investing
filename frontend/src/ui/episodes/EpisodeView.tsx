@@ -19,6 +19,7 @@ import { StatusBadge, StatusVariant } from '../components/StatusBadge';
 import { TranscriptEditor, TranscriptVersion } from './TranscriptEditor';
 import { GuestManager, GuestProfile } from './GuestManager';
 import { EpisodeChat } from './EpisodeChat';
+import { Navbar } from '../components/Navbar';
 
 /**
  * Episode shape returned by the API
@@ -496,6 +497,7 @@ export function EpisodeView({ episodeId }: EpisodeViewProps): JSX.Element {
   });
   return (
     <div className="min-h-screen bg-gray-50">
+      <Navbar />
       <ProgressOverlay
         isVisible={overlay.visible}
         step={overlay.step}
