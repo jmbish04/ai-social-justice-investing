@@ -242,7 +242,7 @@ def build_guest_profiles(table: Dict[str, Dict[str, str]], details: Dict[str, Di
 
 
 def extract_name_descriptor_pairs(raw: str) -> List[Tuple[str, Optional[str]]]:
-    pairs = re.findall(r"([A-Z][A-Za-z\-\.'\s]+?)\s*\(([^)]+)\)", raw)
+    pairs = re.findall(r"(.+?)\s*\(([^)]+)\)", raw)
     results: List[Tuple[str, Optional[str]]] = []
     for name, descriptor in pairs:
         clean_name = name.strip().rstrip('+').strip()
