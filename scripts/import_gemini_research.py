@@ -122,7 +122,7 @@ class RenegadeApiClient:
             raise ApiError(None, str(url_err.reason), url) from None
 
     def _url(self, path: str) -> str:
-        return urllib.parse.urljoin(self.base_url + '/', path.lstrip('/'))
+        return f"{self.base_url}/{path.lstrip('/')}"
 
 
 def parse_guest_table(text: str) -> Dict[str, Dict[str, str]]:
