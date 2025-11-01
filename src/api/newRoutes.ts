@@ -65,6 +65,30 @@ newApi.post('/threads', async (c) => {
 });
 
 /**
+ * GET /api/threads
+ * List all threads (for sidebar)
+ */
+newApi.get('/threads', async (c) => {
+  try {
+    const limit = parseInt(c.req.query('limit') || '50');
+    const result = await c.env.DB.prepare(
+      'SELECT * FROM threads ORDER BY created_at DESC LIMIT ?'
+    )
+      .bind(limit)
+      .all<Thread>();
+
+    return c.json({
+      success: true,
+      data: result.results || [],
+      count: result.results?.length || 0,
+    });
+  } catch (error) {
+    console.error('Error fetching threads:', error);
+    return c.json({ success: false, error: 'Failed to fetch threads' }, 500);
+  }
+});
+
+/**
  * GET /api/threads/:id
  * Get thread by ID
  */
@@ -164,6 +188,11 @@ newApi.post('/brainstorm/:threadId/reply', async (c) => {
     }
 
     // Build messages array with system prompt and conversation history
+    // Ensure we have valid messages and filter out any invalid entries
+    const conversationMessages = conversationHistory
+      .slice(-10) // Last 10 messages for context
+      .filter(msg => msg && msg.role && msg.content && typeof msg.content === 'string');
+
     const aiMessages: Array<{ role: string; content: string }> = [
       {
         role: 'system',
@@ -172,7 +201,7 @@ Help users develop ideas for podcast episodes, research topics, and social justi
 Be creative, thoughtful, and encourage exploration of equity, access, and systems repair.
 When discussing episode "${episodeTitle || 'this episode'}", be specific and relevant to the content.`,
       },
-      ...conversationHistory.slice(-10), // Last 10 messages for context
+      ...conversationMessages,
       { role: 'user', content: message },
     ];
 
@@ -183,19 +212,36 @@ When discussing episode "${episodeTitle || 'this episode'}", be specific and rel
         throw new Error('AI binding is not available');
       }
 
-      const aiResponse = await c.env.AI.run(c.env.MODEL_REASONING || '@cf/meta/llama-3.1-8b-instruct', {
+      // Use the correct model format
+      const model = c.env.MODEL_REASONING || '@cf/meta/llama-3.1-8b-instruct';
+
+      console.log('Calling AI with model:', model, 'messages:', aiMessages.length);
+
+      const aiResponse = await c.env.AI.run(model, {
         messages: aiMessages,
         max_tokens: 500,
         temperature: 0.8,
       });
 
+      console.log('AI response received:', typeof aiResponse, aiResponse);
+
       // Handle response format - can be response.response or directly in response
-      assistantMessage = aiResponse?.response || 
-                         aiResponse?.text || 
+      assistantMessage = aiResponse?.response ||
+                         aiResponse?.text ||
                          (typeof aiResponse === 'string' ? aiResponse : 'I apologize, but I had trouble generating a response.');
+
+      if (!assistantMessage || assistantMessage.trim().length === 0) {
+        throw new Error('AI returned empty response');
+      }
     } catch (aiError: any) {
       console.error('AI generation error:', aiError);
-      assistantMessage = `I encountered an error: ${aiError?.message || 'Failed to generate response'}. Please try again.`;
+      const errorMsg = aiError?.message || String(aiError);
+      // Provide more helpful error message
+      if (errorMsg.includes('oneOf') || errorMsg.includes('required properties')) {
+        assistantMessage = `I'm having trouble connecting to the AI service. This might be a temporary issue. Please try again in a moment.`;
+      } else {
+        assistantMessage = `I encountered an error: ${errorMsg}. Please try again.`;
+      }
     }
 
     // Save assistant message
@@ -935,7 +981,7 @@ newApi.get('/guest-profiles', async (c) => {
 newApi.post('/guest-profiles', async (c) => {
   try {
     const body = await c.req.json();
-    const { name, persona_description, expertise, tone, background } = body;
+    const { name, persona_description, expertise, tone, background, isBookContributor } = body;
 
     if (!name || !persona_description) {
       return c.json({ success: false, error: 'Name and persona description are required' }, 400);
@@ -960,17 +1006,27 @@ newApi.post('/guest-profiles', async (c) => {
 
     const profileId = crypto.randomUUID();
     const now = Date.now();
+    const bookContributor = isBookContributor ? 1 : 0;
 
     try {
+      // Try with is_book_contributor first
       await c.env.DB.prepare(
-        `INSERT INTO guest_profiles (id, name, persona_description, expertise, tone, background, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?)`
+        `INSERT INTO guest_profiles (id, name, persona_description, expertise, tone, background, is_book_contributor, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
       )
-        .bind(profileId, name.trim(), persona_description, expertise || null, tone || null, background || null, now)
+        .bind(profileId, name.trim(), persona_description, expertise || null, tone || null, background || null, bookContributor, now)
         .run();
     } catch (insertError: any) {
-      // If insert fails due to unique constraint, try to fetch existing
-      if (insertError?.message?.includes('UNIQUE') || insertError?.message?.includes('unique')) {
+      // If column doesn't exist yet (migration not run), fall back to old schema
+      if (insertError?.message?.includes('no such column: is_book_contributor')) {
+        await c.env.DB.prepare(
+          `INSERT INTO guest_profiles (id, name, persona_description, expertise, tone, background, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        )
+          .bind(profileId, name.trim(), persona_description, expertise || null, tone || null, background || null, now)
+          .run();
+      } else if (insertError?.message?.includes('UNIQUE') || insertError?.message?.includes('unique')) {
+        // If insert fails due to unique constraint, try to fetch existing
         const existingAfterError = await c.env.DB.prepare(
           'SELECT * FROM guest_profiles WHERE LOWER(TRIM(name)) = ?'
         )
@@ -984,8 +1040,9 @@ newApi.post('/guest-profiles', async (c) => {
             message: 'Guest profile already exists with this name',
           }, 200);
         }
+      } else {
+        throw insertError;
       }
-      throw insertError;
     }
 
     const created = await c.env.DB.prepare('SELECT * FROM guest_profiles WHERE id = ?')
@@ -998,9 +1055,9 @@ newApi.post('/guest-profiles', async (c) => {
     }, 201);
   } catch (error: any) {
     console.error('Error creating guest profile:', error);
-    return c.json({ 
-      success: false, 
-      error: error?.message || 'Failed to create guest profile' 
+    return c.json({
+      success: false,
+      error: error?.message || 'Failed to create guest profile'
     }, 500);
   }
 });

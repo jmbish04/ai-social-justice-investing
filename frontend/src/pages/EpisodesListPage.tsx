@@ -7,6 +7,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { StatusBadge, StatusVariant } from '../ui/components/StatusBadge';
+import { Navbar } from '../ui/components/Navbar';
 
 interface Episode {
   id: string;
@@ -42,14 +43,18 @@ export default function EpisodesListPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div>Loading episodes...</div>
+      <div className="min-h-screen bg-gray-50">
+        <Navbar />
+        <div className="flex items-center justify-center py-16">
+          <div>Loading episodes...</div>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
+      <Navbar />
       <div className="max-w-7xl mx-auto px-4 py-8">
         <header className="mb-8">
           <h1 className="text-3xl font-bold mb-2">Podcast Episodes</h1>

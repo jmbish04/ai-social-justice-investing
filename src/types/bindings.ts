@@ -112,6 +112,7 @@ export interface GuestProfile {
   expertise: string | null;
   tone: string | null;
   background: string | null;
+  is_book_contributor: number; // 0 = false, 1 = true. Tracks if guest appeared in "The Social Justice Investor" book
   created_at: number;
   updated_at: number | null;
 }

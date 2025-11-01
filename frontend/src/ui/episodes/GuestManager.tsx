@@ -16,6 +16,7 @@ export interface GuestProfile {
   persona_description: string;
   expertise?: string | null;
   tone?: string | null;
+  is_book_contributor?: number; // 0 = false, 1 = true
 }
 
 /**
@@ -74,8 +75,19 @@ export function GuestManager({ assigned, available, loading, onAdd, onRemove }: 
 
         {assigned.map((guest) => (
           <div key={guest.id} className="flex items-start justify-between gap-4 rounded-lg border border-gray-200 p-4">
-            <div>
-              <p className="font-semibold text-gray-900">{guest.name}</p>
+            <div className="flex-1">
+              <div className="flex items-center gap-2 mb-1">
+                <p className="font-semibold text-gray-900">{guest.name}</p>
+                {guest.is_book_contributor === 1 ? (
+                  <span className="inline-flex items-center rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                    Book Contributor
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-800">
+                    Guest Voice
+                  </span>
+                )}
+              </div>
               <p className="text-sm text-gray-600">{guest.persona_description}</p>
               {(guest.expertise || guest.tone) && (
                 <p className="mt-1 text-xs text-gray-500">
@@ -86,7 +98,7 @@ export function GuestManager({ assigned, available, loading, onAdd, onRemove }: 
             <button
               type="button"
               onClick={() => onRemove(guest.id)}
-              className="rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
+              className="flex-shrink-0 rounded-lg border border-gray-300 px-3 py-1 text-xs font-medium text-gray-600 hover:bg-gray-100"
             >
               Remove
             </button>
@@ -109,7 +121,7 @@ export function GuestManager({ assigned, available, loading, onAdd, onRemove }: 
             <option value="">Select guest profile…</option>
             {addableGuests.map((guest) => (
               <option key={guest.id} value={guest.id}>
-                {guest.name}
+                {guest.name} {guest.is_book_contributor === 1 ? '📚 (Book)' : '🎙️ (Guest)'}
               </option>
             ))}
           </select>
