@@ -32,7 +32,7 @@ export function Navbar() {
             <Link
               to="/"
               className={`text-sm font-medium transition-colors ${
-                isActive('/') && location.pathname === '/'
+                isActive('/')
                   ? 'text-indigo-600'
                   : 'text-gray-600 hover:text-indigo-600'
               }`}
