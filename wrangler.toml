@@ -5,16 +5,8 @@ compatibility_flags = ["nodejs_compat"]
 
 # Logs
 [observability]
-[observability.logs]
 enabled = true
-head_sampling_rate = 1
-invocation_logs = true
-persist = true
 
-[observability.traces]
-enabled = false
-persist = true
-head_sampling_rate = 1
 
 # D1 Database for structured data
 [[d1_databases]]
@@ -31,6 +23,10 @@ bucket_name = "sji-app-public"
 [[kv_namespaces]]
 binding = "KV"
 id = "ae22b132a2fd453ca9cc04c1ab3b0da9"
+
+# Workers AI binding
+[ai]
+binding = "AI"
 
 # Legacy KV Namespaces (preserved for backward compatibility)
 [[kv_namespaces]]
@@ -67,8 +63,7 @@ MODEL_STT = "@cf/openai/whisper-large-v3-turbo" #Accurate, multilingual ASR
 MODEL_VOICE_GEN = "@cf/myshell-ai/melotts" #Multi-speaker TTS, cheap + fast
 MODEL_SPEAKER_DETECT = "@cf/pipecat-ai/smart-turn-v2" #Realtime turn segmentation
 
-# Secrets (set via: wrangler secret put ADMIN_TOKEN)
-# ADMIN_TOKEN = "your-secret-token-here"
+# No authentication required - public API
 
 # Assets binding for static frontend files
 [assets]
@@ -78,11 +73,3 @@ binding = "ASSETS"
 # Build configuration
 [build]
 command = "npm run build:frontend"
-
-# Local development settings
-[env.dev]
-name = "sji-app-dev"
-
-[env.dev.vars]
-ENVIRONMENT = "development"
-R2_PUBLIC_URL = "http://localhost:8787"

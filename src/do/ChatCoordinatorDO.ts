@@ -97,6 +97,23 @@ export class ChatCoordinatorDO extends DurableObject<Bindings> {
 
     // Route based on path
     const path = url.pathname;
+    
+    // Handle history request
+    if (path === '/history' && request.method === 'GET') {
+      const state = await this.getState(threadId);
+      return new Response(
+        JSON.stringify({
+          success: true,
+          messages: state.messages.map((msg) => ({
+            role: msg.role,
+            content: msg.content,
+          })),
+        }),
+        {
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
 
     if (path === '/init' && request.method === 'POST') {
       return this.handleInit(threadId);

@@ -12,9 +12,20 @@
     "build": "npm run build:frontend && npm run build:worker",
     "build:frontend": "vite build",
     "build:worker": "wrangler deploy --dry-run",
+    "types": "wrangler types",
+    "postinstall": "npm run types",
     "tail": "wrangler tail",
-    "db:migrate": "wrangler d1 migrations apply DB --remote",
-    "db:migrate:local": "wrangler d1 migrations apply DB --local",
+    "deploy:import": "bash scripts/deploy-and-import.sh",
+    "db:migrate": "wrangler d1 migrations apply sji-app-db --remote",
+    "db:migrate:local": "wrangler d1 migrations apply sji-app-db --local",
+    "db:status": "wrangler d1 migrations list sji-app-db --remote",
+    "db:status:local": "wrangler d1 migrations list sji-app-db --local",
+    "db:check": "bash scripts/check-db-status.sh",
+    "db:deduplicate-guests": "wrangler d1 execute sji-app-db --remote --file scripts/deduplicate_guests.sql",
+    "import:json": "python3 scripts/import_json_data.py",
+    "import:json:remote": "python3 scripts/import_json_data.py",
+    "import:gemini": "python3 scripts/import_gemini_research.py --generate-all",
+    "deploy:full": "npm run build && npm run db:migrate && npm run deploy && echo '✅ Deployment complete! Run: npm run import:gemini'",
     "test": "vitest run"
   },
   "keywords": [
@@ -31,6 +42,7 @@
     "@hono/zod-openapi": "^0.16.0",
     "ai": "^3.4.7",
     "hono": "^4.0.0",
+    "js-yaml": "^4.1.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {
@@ -38,6 +50,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
     "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^24.9.2",
     "@types/react": "^18.3.11",
     "@types/react-dom": "^18.3.1",
     "@vitejs/plugin-react": "^4.3.3",

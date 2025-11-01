@@ -1,7 +1,5 @@
 import { Hono } from 'hono';
-import { cors } from 'hono/cors';
-import { Bindings } from './types/bindings';
-import { authMiddleware } from './middleware/auth';
+import { Bindings, Episode } from './types/bindings';
 import apiRoutes from './api/routes';
 import newApiRoutes from './api/newRoutes';
 
@@ -12,7 +10,8 @@ import { researchPage } from './pages/research';
 import { pairingsPage } from './pages/pairings';
 import { submitPage } from './pages/submit';
 
-// Import data
+// Note: Episodes, research, and pairings are now served via API endpoints
+// These JSON imports are kept for backward compatibility only (legacy pages)
 import episodesData from './data/episodes.json';
 import researchData from './data/research.json';
 import pairingsData from './data/pairings.json';
@@ -23,11 +22,6 @@ export { EpisodeActor } from './actors/EpisodeActor';
 
 // Create Hono app with type-safe bindings
 const app = new Hono<{ Bindings: Bindings }>();
-
-// Middleware
-app.use('*', cors({
-  origin: ['http://localhost:8787', 'https://your-production-domain.com']
-}));
 
 // Health check endpoint
 app.get('/health', (c) => {
@@ -43,37 +37,89 @@ app.get('/', (c) => {
   return c.html(homePage());
 });
 
-app.get('/episodes', (c) => {
-  return c.html(episodesPage(episodesData));
+app.get('/episodes', async (c) => {
+  // Try to fetch from D1, fallback to static data
+  try {
+    const result = await c.env.DB.prepare('SELECT * FROM episodes ORDER BY created_at DESC')
+      .all<any>();
+    const episodes = (result.results || []).map((row: any): Episode => ({
+      id: row.id,
+      title: row.title,
+      description: row.description || '',
+      guest: '', // Will be populated from episode_guests if needed
+      status: (row.status || 'planned') as 'planned' | 'recorded' | 'published',
+      dateCreated: row.created_at ? new Date(row.created_at).toISOString().split('T')[0] : undefined,
+    }));
+    const staticEpisodes = episodesData.map((ep: any): Episode => ({
+      ...ep,
+      status: ep.status as 'planned' | 'recorded' | 'published',
+    }));
+    return c.html(episodesPage(episodes.length > 0 ? episodes : staticEpisodes));
+  } catch (error) {
+    console.error('Error loading episodes from D1, using static data:', error);
+    const staticEpisodes = episodesData.map((ep: any): Episode => ({
+      ...ep,
+      status: ep.status as 'planned' | 'recorded' | 'published',
+    }));
+    return c.html(episodesPage(staticEpisodes));
+  }
 });
 
 app.get('/research', async (c) => {
   try {
-    // Fetch any additional research from KV
-    const kvEntries = await c.env.RESEARCH_KV.list();
-    const additionalResearch = [];
-
-    for (const key of kvEntries.keys) {
-      const value = await c.env.RESEARCH_KV.get(key.name);
-      if (value) {
-        try {
-          additionalResearch.push(JSON.parse(value));
-        } catch (e) {
-          console.error(`Failed to parse research entry ${key.name}:`, e);
-        }
-      }
-    }
-
-    const allResearch = [...researchData, ...additionalResearch];
-    return c.html(researchPage(allResearch));
+    // Fetch research entries from D1
+    const result = await c.env.DB.prepare(
+      'SELECT * FROM research_entries ORDER BY date_added DESC, created_at DESC'
+    ).all<any>();
+    
+    const research = (result.results || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      domain: row.domain || '',
+      chemistry: row.chemistry || '',
+      topic: row.topic || '',
+      link: row.link || '',
+      dateAdded: row.date_added ? new Date(row.date_added * 1000).toISOString().split('T')[0] : undefined,
+    }));
+    
+    return c.html(researchPage(research.length > 0 ? research : researchData));
   } catch (error) {
-    console.error('Error loading research page:', error);
+    console.error('Error loading research from D1, using static data:', error);
     return c.html(researchPage(researchData));
   }
 });
 
-app.get('/pairings', (c) => {
-  return c.html(pairingsPage(pairingsData));
+app.get('/pairings', async (c) => {
+  try {
+    // Fetch pairings from D1
+    const result = await c.env.DB.prepare(
+      'SELECT * FROM pairings ORDER BY confidence_score DESC, created_at DESC'
+    ).all<any>();
+    
+    const pairings = (result.results || []).map((row: any) => {
+      let chemistry: string[] = [];
+      try {
+        chemistry = row.chemistry_tags ? JSON.parse(row.chemistry_tags) : [];
+      } catch {
+        // If parsing fails, treat as empty
+      }
+      
+      return {
+        id: row.id,
+        guestName: row.guest_name,
+        authorName: row.author_name,
+        chemistry,
+        topic: row.topic || '',
+        reasoning: row.reasoning || '',
+        confidenceScore: row.confidence_score || 0,
+      };
+    });
+    
+    return c.html(pairingsPage(pairings.length > 0 ? pairings : pairingsData));
+  } catch (error) {
+    console.error('Error loading pairings from D1, using static data:', error);
+    return c.html(pairingsPage(pairingsData));
+  }
 });
 
 app.get('/submit', (c) => {
@@ -83,6 +129,10 @@ app.get('/submit', (c) => {
 // API Routes
 app.route('/api', apiRoutes);
 app.route('/api', newApiRoutes);
+
+// OpenAPI Specification
+import { openApiRegistry } from './openapi/spec';
+app.route('/', openApiRegistry);
 
 // 404 Handler
 app.notFound((c) => {
@@ -109,7 +159,7 @@ app.notFound((c) => {
 });
 
 // Error Handler
-app.onError((err, c) => {
+app.onError((err: Error, c) => {
   console.error('Application error:', err);
   return c.json({
     error: 'Internal Server Error',

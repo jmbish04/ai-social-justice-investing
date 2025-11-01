@@ -24,7 +24,6 @@ export type Bindings = {
   AI: Ai;
 
   // Environment variables
-  ADMIN_TOKEN: string;
   ENVIRONMENT: string;
   R2_PUBLIC_URL: string;
   MODEL_REASONING: string;

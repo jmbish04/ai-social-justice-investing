@@ -98,11 +98,37 @@ npm run dev
 ### Deploy to Production
 
 ```bash
-# Deploy manually
+# Option 1: Full deployment with data import (recommended)
+export WORKER_URL="https://social-investing.hacolby.workers.dev"
+npm run deploy:import
+
+# Option 2: Step-by-step deployment
+npm run deploy              # Build, migrate, and deploy
+python3 scripts/import_gemini_research.py \
+  --base-url https://social-investing.hacolby.workers.dev \
+  --generate-all
+
+# Option 3: Just deploy (no import)
 npm run deploy
 
-# Or push to main branch for automatic GitHub Actions deployment
+# Option 4: Push to main for automatic GitHub Actions deployment (if configured)
 git push origin main
+```
+
+**📖 See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md) for complete deployment and import instructions.**
+
+### Import Initial Data
+
+After deployment, import your data:
+
+```bash
+# Import JSON data files (episodes.json, research.json, pairings.json)
+npm run import:json:remote
+
+# Import Gemini Deep Research data (with guests, episodes, transcripts)
+npm run import:gemini
+# Or directly:
+python3 scripts/import_gemini_research.py --generate-all
 ```
 
 ## 🔧 Configuration
@@ -158,20 +184,12 @@ The `/api/submit` endpoint supports optional token-based authentication:
 
 **Via Header:**
 ```bash
-curl -X POST https://your-worker.workers.dev/api/submit \
-  -H "Authorization: Bearer YOUR_TOKEN" \
+curl -X POST https://social-investing.hacolby.workers.dev/api/submit \
   -H "Content-Type: application/json" \
   -d '{"type":"episode","content":"# My Idea\n\nDescription here..."}'
 ```
 
-**Via Query Parameter:**
-```bash
-curl -X POST "https://your-worker.workers.dev/api/submit?token=YOUR_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"type":"episode","content":"# My Idea\n\nDescription here..."}'
-```
-
-If no `ADMIN_TOKEN` is set, the endpoint is publicly accessible (useful for development).
+**Note:** All endpoints are publicly accessible - no authentication required.
 
 ## 🎨 Customization
 

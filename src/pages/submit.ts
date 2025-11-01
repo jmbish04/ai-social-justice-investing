@@ -55,22 +55,6 @@ Explain the impact and relevance..."
             </p>
           </div>
 
-          <!-- Token Field (Optional for authentication) -->
-          <div>
-            <label for="token" class="block text-sm font-medium text-gray-700 mb-2">
-              Access Token (if required)
-            </label>
-            <input
-              type="password"
-              id="token"
-              name="token"
-              placeholder="Enter token if authentication is enabled"
-              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring-primary sm:text-sm px-3 py-2 border"
-            />
-            <p class="mt-2 text-sm text-gray-500">
-              Leave blank if no token is configured
-            </p>
-          </div>
 
           <!-- Submit Button -->
           <div class="flex items-center justify-between">
@@ -174,9 +158,8 @@ Explain the impact and relevance..."
             content: formData.get('content'),
           };
 
-          // Build query string with token if provided
-          const token = formData.get('token');
-          const url = token ? \`/api/submit?token=\${encodeURIComponent(token)}\` : '/api/submit';
+          // No authentication required - public API
+          const url = '/api/submit';
 
           const response = await fetch(url, {
             method: 'POST',

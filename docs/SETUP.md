@@ -112,7 +112,7 @@ npm run deploy
 
 Your app will be deployed to:
 ```
-https://ai-social-justice-investing.YOUR-SUBDOMAIN.workers.dev
+https://social-investing.hacolby.workers.dev
 ```
 
 The URL will be shown in the terminal output.
@@ -157,17 +157,12 @@ For automatic deployments on push to `main`:
 
 You forgot to update the KV namespace IDs in `wrangler.toml`. Go back to step 4.
 
-### "Unauthorized" when accessing /api/submit
+### API Access Issues
 
-Either:
-- You haven't set `ADMIN_TOKEN` (it's optional in dev mode)
-- You're using the wrong token
-- You forgot to include the token in your request
-
-To reset the token:
-```bash
-npx wrangler secret put ADMIN_TOKEN
-```
+All endpoints are publicly accessible. If you encounter access issues:
+- Verify your Worker is deployed: `curl https://your-worker.workers.dev/health`
+- Check the endpoint URL is correct
+- Review Cloudflare dashboard logs for errors
 
 ### "Module not found" errors
 

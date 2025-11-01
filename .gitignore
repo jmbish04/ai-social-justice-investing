@@ -137,3 +137,6 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Generated Wrangler types (optional - can be committed or regenerated)
+# worker-configuration.d.ts

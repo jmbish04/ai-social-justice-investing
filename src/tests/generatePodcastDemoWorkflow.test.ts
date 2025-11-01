@@ -230,7 +230,7 @@ function createTestBindings(db: D1Database): Bindings {
     CHAT_COORDINATOR: {} as unknown as DurableObjectNamespace,
     EPISODE_ACTOR: {} as unknown as DurableObjectNamespace,
     AI: {} as unknown as Ai,
-    ADMIN_TOKEN: 'test-token',
+    // ADMIN_TOKEN removed - no authentication required
     ENVIRONMENT: 'test',
     R2_PUBLIC_URL: 'https://r2.example.com',
     MODEL_REASONING: '@test/model',

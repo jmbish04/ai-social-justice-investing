@@ -225,21 +225,21 @@ npm run dev
 ### Ideas
 
 - `POST /api/ideas` - Save idea from brainstorm
-- `GET /api/ideas` - List all ideas (requires auth)
+- `GET /api/ideas` - List all ideas
 
 ### Episodes
 
 - `GET /api/episodes` - List episodes
-- `POST /api/episodes` - Create episode (requires auth)
+- `POST /api/episodes` - Create episode
 - `GET /api/episodes/:id` - Get episode details
 - `GET /api/episodes/:id/guests` - List episode guests
-- `POST /api/episodes/:id/guests` - Add guest to episode (requires auth)
-- `POST /api/episodes/:id/generate-audio` - Trigger podcast generation (requires auth)
+- `POST /api/episodes/:id/guests` - Add guest to episode
+- `POST /api/episodes/:id/generate-audio` - Trigger podcast generation
 
 ### Guest Profiles
 
 - `GET /api/guest-profiles` - List all guest profiles
-- `POST /api/guest-profiles` - Create guest profile (requires auth)
+- `POST /api/guest-profiles` - Create guest profile
 - `GET /api/guest-profiles/:id` - Get guest profile
 
 ### Legacy Endpoints (Preserved)
@@ -248,21 +248,9 @@ npm run dev
 - `GET /api/episodes` - Static episodes data
 - `GET /api/pairings` - Guest-author pairings
 
-## 🔐 Authentication
+## 🔓 Public API
 
-Token-based auth via middleware:
-
-```typescript
-// Required for admin operations
-headers: {
-  'Authorization': 'Bearer YOUR_ADMIN_TOKEN'
-}
-```
-
-Set via Wrangler secret:
-```bash
-wrangler secret put ADMIN_TOKEN
-```
+All API endpoints are publicly accessible - no authentication required. This makes the platform open and accessible to all users.
 
 ## 🧪 Testing
 
