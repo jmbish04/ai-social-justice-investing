@@ -215,16 +215,13 @@ When discussing episode "${episodeTitle || 'this episode'}", be specific and rel
       // Use the correct model format
       const model = c.env.MODEL_REASONING || '@cf/meta/llama-3.1-8b-instruct';
 
-      console.log('Calling AI with model:', model, 'messages:', aiMessages.length);
-
       const aiResponse = await c.env.AI.run(model, {
         messages: aiMessages,
         max_tokens: 500,
         temperature: 0.8,
       });
 
-      console.log('AI response received:', typeof aiResponse, aiResponse);
-
+      // Handle response format - can be response.response or directly in response
       // Handle response format - can be response.response or directly in response
       assistantMessage = aiResponse?.response ||
                          aiResponse?.text ||
